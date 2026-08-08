@@ -18,8 +18,7 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     api_public_url: str = "http://localhost:8000"
-    public_webapp_url: str = "http://localhost:5173"
-    web_cors_origins: str = "http://localhost:5173"
+    web_cors_origins: str = "http://localhost:8000"
 
     database_url: str = "sqlite:///./fitness_coach.sqlite3"
     redis_url: str = "redis://localhost:6379/0"

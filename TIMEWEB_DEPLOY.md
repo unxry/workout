@@ -1,16 +1,19 @@
-# Timeweb Cloud App Platform Deploy
+# Timeweb Cloud Backend Deploy
 
-Timeweb App Platform is simplest with one Docker container. The root `Dockerfile` builds the Telegram Mini App and serves it from FastAPI together with the API.
+Deploy this repository as one Docker backend service.
 
 Use this setup for Timeweb:
 
 - Repository: `https://github.com/unxry/workout`
 - Branch: `main`
-- Build type/framework: `Dockerfile` / `Docker`
+- Framework/type: `Other` or `Dockerfile`, depending on the Timeweb screen
 - Dockerfile path: `Dockerfile`
+- Project directory: empty or `/`
 - Port: `8080`
+- Build command: empty
+- Build directory: empty
 
-Timeweb App Platform does not use `docker-compose.yml` for this flow, so use the root `Dockerfile`.
+The root `Dockerfile` starts FastAPI directly. It does not build or serve a React frontend.
 
 ## Environment Variables
 
@@ -25,13 +28,12 @@ ADMIN_API_KEY=generate_a_long_random_value
 OPENAI_API_KEY=your_openai_key_optional
 OPENAI_MODEL=gpt-4.1-mini
 API_PUBLIC_URL=https://your-timeweb-app-domain
-PUBLIC_WEBAPP_URL=https://your-timeweb-app-domain
 WEB_CORS_ORIGINS=https://your-timeweb-app-domain
 ```
 
 For a quick first launch, SQLite is enough. Later, move `DATABASE_URL` to a managed PostgreSQL database.
 
-## Check The App
+## Check The API
 
 After deploy, open:
 
@@ -55,8 +57,7 @@ Expected:
 
 ```json
 {
-  "telegram_token_configured": true,
-  "public_webapp_url_is_https": true
+  "telegram_token_configured": true
 }
 ```
 
@@ -73,4 +74,4 @@ Then send `/start` to the Telegram bot.
 
 ## Important
 
-Do not use `npm run dev:bot` on Timeweb. Production must use webhook mode.
+Do not use local polling in production. Production must use webhook mode.

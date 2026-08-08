@@ -1,53 +1,60 @@
-# AI Fitness Coach Telegram Mini App
+# AI Fitness Coach Backend
 
-Commercial-grade Telegram Mini App and bot scaffold for a proactive AI fitness coach with long-term memory.
+FastAPI backend for a proactive AI fitness coach with long-term memory.
 
-## What is included
+This repository now intentionally contains only the server side. The old Telegram Mini App / React frontend was removed so the backend can be deployed cleanly and later connected to a native iOS client.
 
-- React + TypeScript Telegram Mini App UI in `apps/web`
-- FastAPI backend in `apps/api`
+## Included
+
+- FastAPI API in `apps/api`
 - Telegram Bot API webhook handler
 - Long-term memory models for profile, meals, daily snapshots, strategy, reminders, and coach events
 - Proactive daily analysis engine for nutrition, weight, activity, sleep, and adherence
 - OpenAI integration hook with deterministic fallback recommendations
-- Docker Compose for API, web, PostgreSQL, Redis, and Nginx
+- Dockerfile for single-container backend deployment
+- Docker Compose for local API, PostgreSQL, and Redis
 - Focused backend tests for nutrition calculations and proactive coach analysis
 
-## Quick start
+## Local API
 
 ```bash
 cp .env.example .env
-npm install
-npm run install:api
-npm run dev
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r apps/api/requirements.txt
+cd apps/api
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 API runs on `http://localhost:8000`.
-Mini App runs on `http://localhost:5173`.
 
-## Local Telegram bot
+## Local Telegram Bot
 
 For local development, Telegram cannot call `http://localhost:8000` as a webhook. Use long polling:
 
 ```bash
-npm run dev:bot
-```
-
-Or run everything together:
-
-```bash
-npm run dev:all
+. .venv/bin/activate
+cd apps/api
+python -m app.bot.polling
 ```
 
 Polling automatically calls `deleteWebhook`, then listens for Telegram updates and replies to `/start` and regular messages.
 
-## Telegram setup
+## Telegram Webhook
 
-1. Create or open your bot in BotFather.
-2. Put the token into `.env` as `TELEGRAM_BOT_TOKEN`.
-3. For local bot replies, run `npm run dev:bot`.
-4. For a real Telegram Mini App button on a phone, set `PUBLIC_WEBAPP_URL` to an HTTPS URL.
-5. For production webhook mode, set `API_PUBLIC_URL` to your HTTPS API URL and register webhook:
+Set these variables in production:
+
+```env
+APP_ENV=production
+API_PUBLIC_URL=https://your-server-domain
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_WEBHOOK_SECRET=generate_a_long_random_value
+ADMIN_API_KEY=generate_a_long_random_value
+OPENAI_API_KEY=your_openai_key_optional
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+Register the webhook:
 
 ```bash
 curl -X POST "$API_PUBLIC_URL/api/telegram/set-webhook" \
@@ -57,44 +64,26 @@ curl -X POST "$API_PUBLIC_URL/api/telegram/set-webhook" \
 Useful diagnostics:
 
 ```bash
-curl "$API_PUBLIC_URL/api/telegram/webhook-info" \
-  -H "X-Admin-Key: $ADMIN_API_KEY"
+curl "$API_PUBLIC_URL/api/health"
 
-curl -X POST "$API_PUBLIC_URL/api/telegram/delete-webhook" \
+curl "$API_PUBLIC_URL/api/telegram/debug"
+
+curl "$API_PUBLIC_URL/api/telegram/webhook-info" \
   -H "X-Admin-Key: $ADMIN_API_KEY"
 ```
 
 Do not commit real tokens. If a token was shared in chat or logs, rotate it in BotFather before production.
 
-## Railway Deployment
+## Timeweb Cloud
 
-For the simplest production launch, use Railway with two services from this repository:
-
-- API service from `apps/api`
-- Web service from `apps/web`
-
-See [RAILWAY_DEPLOY.md](RAILWAY_DEPLOY.md) for exact settings and environment variables.
-
-If Railway reports `Missing script: "build"`, the service is pointed at the wrong root directory or an old commit. The web service root must be `apps/web`, or it must use the root package scripts from the latest `main` branch.
-
-If the deployed Telegram bot does not reply to `/start`, open:
-
-```text
-https://your-api-service.up.railway.app/api/telegram/debug
-```
-
-Then register the webhook with `/api/telegram/set-webhook` as described in [RAILWAY_DEPLOY.md](RAILWAY_DEPLOY.md).
-
-## Timeweb Cloud Deployment
-
-For Timeweb Cloud App Platform, use the root `Dockerfile`. It builds the Mini App and serves it from the same FastAPI service, so you only need one app URL.
+Use the root `Dockerfile` as a backend Docker service.
 
 See [TIMEWEB_DEPLOY.md](TIMEWEB_DEPLOY.md).
 
-## Production With Docker Compose
+## Docker Compose
 
 ```bash
 docker compose up --build -d
 ```
 
-The API uses SQLite by default for local development. In Docker it uses PostgreSQL through `DATABASE_URL`.
+The API uses SQLite by default for quick local development. In Docker Compose it uses PostgreSQL through `DATABASE_URL`.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -31,19 +30,6 @@ async def send_message(chat_id: str, text: str, reply_markup: dict[str, Any] | N
     async with httpx.AsyncClient(timeout=12) as client:
         response = await client.post(telegram_api_url("sendMessage"), json=payload)
         response.raise_for_status()
-
-
-def mini_app_keyboard() -> dict[str, Any] | None:
-    webapp_url = get_settings().public_webapp_url
-    parsed = urlparse(webapp_url)
-    if parsed.scheme != "https":
-        return None
-    return {
-        "inline_keyboard": [
-            [{"text": "Open AI Coach", "web_app": {"url": webapp_url}}],
-            [{"text": "Open in browser", "url": webapp_url}],
-        ]
-    }
 
 
 def get_or_create_telegram_user(db: Session, telegram_id: str, first_name: str) -> User:
@@ -84,17 +70,15 @@ async def process_telegram_update(update: dict[str, Any], db: Session) -> None:
         await send_message(
             chat_id=telegram_id,
             text=(
-                "Я буду твоим AI-тренером. Открой приложение, заполни первый профиль, "
+                "Я буду твоим AI-тренером. Когда приложение будет подключено, заполни первый профиль, "
                 "и я начну адаптировать питание, тренировки, восстановление и напоминания."
             ),
-            reply_markup=mini_app_keyboard(),
         )
     else:
         remember(db, user, "telegram_note", text[:500], 0.4, "telegram")
         await send_message(
             chat_id=telegram_id,
-            text="Я сохранил заметку. Открой Mini App, чтобы увидеть, как это меняет план на сегодня.",
-            reply_markup=mini_app_keyboard(),
+            text="Я сохранил заметку. Использую ее в памяти тренера и будущих рекомендациях.",
         )
 
 
@@ -157,7 +141,5 @@ async def telegram_debug() -> dict[str, Any]:
     return {
         "telegram_token_configured": bool(settings.telegram_bot_token),
         "api_public_url": settings.api_public_url,
-        "public_webapp_url": settings.public_webapp_url,
-        "public_webapp_url_is_https": urlparse(settings.public_webapp_url).scheme == "https",
         "webhook_url_would_be": f"{settings.api_public_url}/api/telegram/webhook/<hidden>",
     }

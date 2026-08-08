@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from app.bot.telegram import router as telegram_router
 from app.core.config import get_settings
@@ -41,7 +39,3 @@ app.include_router(users_router)
 app.include_router(tracking_router)
 app.include_router(coach_router)
 app.include_router(telegram_router)
-
-static_dir = Path(__file__).resolve().parents[1] / "static"
-if (static_dir / "index.html").exists():
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="web")
