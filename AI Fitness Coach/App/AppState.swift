@@ -46,19 +46,19 @@ enum CoachTab: String, CaseIterable, Identifiable {
         switch self {
         case .home: "Главная"
         case .nutrition: "Питание"
-        case .coach: "AI"
-        case .progress: "Прогресс"
+        case .coach: "ИИ-помощник"
+        case .progress: "Тренировки"
         case .profile: "Профиль"
         }
     }
 
     var symbol: String {
         switch self {
-        case .home: "house.fill"
+        case .home: "house"
         case .nutrition: "fork.knife"
-        case .coach: "sparkles"
-        case .progress: "chart.xyaxis.line"
-        case .profile: "person.crop.circle"
+        case .coach: "robot"
+        case .progress: "dumbbell"
+        case .profile: "person"
         }
     }
 }
