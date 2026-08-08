@@ -6,6 +6,7 @@ dist
 build
 .next
 .turbo
+*.tsbuildinfo
 .pytest_cache
 __pycache__
 *.pyc
@@ -15,4 +16,3 @@ __pycache__
 coverage
 htmlcov
 .DS_Store
-

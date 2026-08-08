@@ -66,11 +66,19 @@ curl -X POST "$API_PUBLIC_URL/api/telegram/delete-webhook" \
 
 Do not commit real tokens. If a token was shared in chat or logs, rotate it in BotFather before production.
 
-## Production
+## Railway Deployment
+
+For the simplest production launch, use Railway with two services from this repository:
+
+- API service from `apps/api`
+- Web service from `apps/web`
+
+See [RAILWAY_DEPLOY.md](RAILWAY_DEPLOY.md) for exact settings and environment variables.
+
+## Production With Docker Compose
 
 ```bash
 docker compose up --build -d
 ```
 
 The API uses SQLite by default for local development. In Docker it uses PostgreSQL through `DATABASE_URL`.
-# workout
