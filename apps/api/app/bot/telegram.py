@@ -38,7 +38,12 @@ def mini_app_keyboard() -> dict[str, Any] | None:
     parsed = urlparse(webapp_url)
     if parsed.scheme != "https":
         return None
-    return {"inline_keyboard": [[{"text": "Open AI Coach", "web_app": {"url": webapp_url}}]]}
+    return {
+        "inline_keyboard": [
+            [{"text": "Open AI Coach", "web_app": {"url": webapp_url}}],
+            [{"text": "Open in browser", "url": webapp_url}],
+        ]
+    }
 
 
 def get_or_create_telegram_user(db: Session, telegram_id: str, first_name: str) -> User:
@@ -79,8 +84,8 @@ async def process_telegram_update(update: dict[str, Any], db: Session) -> None:
         await send_message(
             chat_id=telegram_id,
             text=(
-                "I will be your AI fitness coach. Open the app, complete the first conversation, "
-                "and I will start adapting nutrition, training, recovery, and reminders."
+                "Я буду твоим AI-тренером. Открой приложение, заполни первый профиль, "
+                "и я начну адаптировать питание, тренировки, восстановление и напоминания."
             ),
             reply_markup=mini_app_keyboard(),
         )
@@ -88,7 +93,7 @@ async def process_telegram_update(update: dict[str, Any], db: Session) -> None:
         remember(db, user, "telegram_note", text[:500], 0.4, "telegram")
         await send_message(
             chat_id=telegram_id,
-            text="I saved this note. Open the Mini App to see how it changes today's plan.",
+            text="Я сохранил заметку. Открой Mini App, чтобы увидеть, как это меняет план на сегодня.",
             reply_markup=mini_app_keyboard(),
         )
 
@@ -144,3 +149,15 @@ async def webhook_info(x_admin_key: str = Header(default="")) -> dict[str, Any]:
         response = await client.get(telegram_api_url("getWebhookInfo"))
         response.raise_for_status()
         return response.json()
+
+
+@router.get("/debug")
+async def telegram_debug() -> dict[str, Any]:
+    settings = get_settings()
+    return {
+        "telegram_token_configured": bool(settings.telegram_bot_token),
+        "api_public_url": settings.api_public_url,
+        "public_webapp_url": settings.public_webapp_url,
+        "public_webapp_url_is_https": urlparse(settings.public_webapp_url).scheme == "https",
+        "webhook_url_would_be": f"{settings.api_public_url}/api/telegram/webhook/<hidden>",
+    }

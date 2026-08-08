@@ -89,6 +89,36 @@ curl "https://your-api-service.up.railway.app/api/telegram/webhook-info" \
   -H "X-Admin-Key: your_admin_api_key"
 ```
 
+## 4. If The Bot Does Not Reply
+
+Open this URL in your browser:
+
+```text
+https://your-api-service.up.railway.app/api/telegram/debug
+```
+
+Expected values:
+
+```json
+{
+  "telegram_token_configured": true,
+  "public_webapp_url_is_https": true
+}
+```
+
+If `telegram_token_configured` is `false`, add `TELEGRAM_BOT_TOKEN` to the API service variables and redeploy.
+
+If `public_webapp_url_is_https` is `false`, set `PUBLIC_WEBAPP_URL` to the Railway HTTPS web service URL and redeploy the API.
+
+Then register the webhook again:
+
+```bash
+curl -X POST "https://your-api-service.up.railway.app/api/telegram/set-webhook" \
+  -H "X-Admin-Key: your_admin_api_key"
+```
+
+After that, send `/start` to the bot.
+
 ## Important
 
 Do not run `npm run dev:bot` in production. Production should use Telegram webhook mode.

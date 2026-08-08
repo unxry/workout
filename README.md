@@ -77,6 +77,14 @@ See [RAILWAY_DEPLOY.md](RAILWAY_DEPLOY.md) for exact settings and environment va
 
 If Railway reports `Missing script: "build"`, the service is pointed at the wrong root directory or an old commit. The web service root must be `apps/web`, or it must use the root package scripts from the latest `main` branch.
 
+If the deployed Telegram bot does not reply to `/start`, open:
+
+```text
+https://your-api-service.up.railway.app/api/telegram/debug
+```
+
+Then register the webhook with `/api/telegram/set-webhook` as described in [RAILWAY_DEPLOY.md](RAILWAY_DEPLOY.md).
+
 ## Production With Docker Compose
 
 ```bash
