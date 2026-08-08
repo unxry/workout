@@ -99,12 +99,12 @@ struct DashboardView: View {
     private var weightTrendSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader(title: "ТРЕНД ВЕСА")
-            PremiumCard(padding: 14, radius: 20) {
-                VStack(alignment: .leading, spacing: 10) {
+            PremiumCard(padding: 13, radius: 20) {
+                VStack(alignment: .leading, spacing: 8) {
                     WeightTrendVisual(points: weightPoints)
-                        .frame(height: 150)
+                        .frame(height: 126)
                     Text("Цель: \(String(format: "%.1f", currentWeight)) → \(String(format: "%.1f", targetWeight)) кг")
-                        .font(.system(size: 17, weight: .medium))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(AppColors.secondaryText)
                         .padding(.horizontal, 2)
                 }
@@ -328,7 +328,7 @@ private struct AIAvatar: View {
                 .fill(AppColors.purple.opacity(0.16))
                 .overlay(Circle().stroke(AppColors.purple, lineWidth: 3))
                 .shadow(color: AppColors.purple.opacity(0.35), radius: 14)
-            Image(systemName: "robot")
+            Image(systemName: "sparkles")
                 .font(.system(size: size * 0.48, weight: .bold))
                 .foregroundStyle(
                     LinearGradient(colors: [AppColors.purple, AppColors.blue], startPoint: .topLeading, endPoint: .bottomTrailing)

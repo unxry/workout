@@ -13,6 +13,9 @@ enum AIClientError: LocalizedError, Equatable {
     case badStatus(Int, String)
     case emptyResponse
     case invalidStructuredResponse
+    case noInternet
+    case requestTimedOut
+    case transport(String)
 
     var errorDescription: String? {
         switch self {
@@ -26,6 +29,28 @@ enum AIClientError: LocalizedError, Equatable {
             return "OpenAI вернул пустой ответ."
         case .invalidStructuredResponse:
             return "OpenAI вернул ответ в неверном формате."
+        case .noInternet:
+            return "Нет подключения к интернету."
+        case .requestTimedOut:
+            return "Запрос к ИИ занял слишком много времени. Попробуйте еще раз."
+        case .transport(let message):
+            return message
+        }
+    }
+
+    static func from(_ error: Error) -> AIClientError {
+        if let aiError = error as? AIClientError { return aiError }
+        guard let urlError = error as? URLError else {
+            return .transport(error.localizedDescription)
+        }
+
+        switch urlError.code {
+        case .notConnectedToInternet, .networkConnectionLost, .cannotFindHost, .cannotConnectToHost, .dataNotAllowed, .internationalRoamingOff:
+            return .noInternet
+        case .timedOut:
+            return .requestTimedOut
+        default:
+            return .transport(urlError.localizedDescription)
         }
     }
 }
@@ -72,6 +97,41 @@ struct FoodPhotoAnalysis: Codable, Equatable {
     var isFood: Bool { status == .food && total != nil && !items.isEmpty }
 }
 
+enum FoodAnalysisValidator {
+    static func normalized(_ analysis: FoodPhotoAnalysis) -> FoodPhotoAnalysis {
+        var normalized = analysis
+        normalized.confidence = min(max(normalized.confidence, 0), 1)
+
+        if normalized.status != .food {
+            normalized.items = []
+            normalized.total = nil
+            if normalized.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                normalized.message = normalized.status == .notFood
+                ? "На фотографии не обнаружена еда."
+                : "Не удалось уверенно определить блюдо. Попробуйте другое фото."
+            }
+            return normalized
+        }
+
+        if normalized.confidence < 0.45 || normalized.items.isEmpty || normalized.total == nil {
+            normalized.status = .uncertain
+            normalized.items = []
+            normalized.total = nil
+            normalized.message = "Не удалось уверенно определить блюдо. Попробуйте другое фото."
+        }
+
+        return normalized
+    }
+}
+
+struct AIImageAttachmentPayload: Equatable {
+    let dataURL: String
+
+    init(imageData: Data, mimeType: String) {
+        dataURL = "data:\(mimeType);base64,\(imageData.base64EncodedString())"
+    }
+}
+
 final class OpenAIClient {
     private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
 
@@ -110,7 +170,7 @@ final class OpenAIClient {
 
     func analyzeFoodImage(imageData: Data, mimeType: String = "image/jpeg", context: String) async throws -> FoodPhotoAnalysis {
         let apiKey = try apiKey()
-        let imageURL = "data:\(mimeType);base64,\(imageData.base64EncodedString())"
+        let imageURL = AIImageAttachmentPayload(imageData: imageData, mimeType: mimeType).dataURL
         let body = VisionChatCompletionRequest(
             model: "gpt-4.1-mini",
             messages: [
@@ -125,6 +185,28 @@ final class OpenAIClient {
         )
         let decoded: ChatCompletionResponse = try await post(body, apiKey: apiKey)
         return try decodeFoodAnalysis(from: decoded)
+    }
+
+    func answerWithImage(imageData: Data, mimeType: String = "image/jpeg", context: CoachContext) async throws -> String {
+        let apiKey = try apiKey()
+        let imageURL = AIImageAttachmentPayload(imageData: imageData, mimeType: mimeType).dataURL
+        let body = VisionChatCompletionRequest(
+            model: "gpt-4.1-mini",
+            messages: [
+                .init(role: "system", content: [.text(imageChatPrompt)]),
+                .init(role: "user", content: [
+                    .text(prompt(from: context)),
+                    .imageURL(.init(url: imageURL))
+                ])
+            ],
+            temperature: 0.35,
+            responseFormat: nil
+        )
+        let decoded: ChatCompletionResponse = try await post(body, apiKey: apiKey)
+        guard let answer = decoded.choices.first?.message.content.trimmingCharacters(in: .whitespacesAndNewlines), !answer.isEmpty else {
+            throw AIClientError.emptyResponse
+        }
+        return answer
     }
 
     func testConnection() async throws {
@@ -162,8 +244,19 @@ final class OpenAIClient {
         UNCERTAIN - изображение нечеткое или еды может не быть.
         Если NOT_FOOD или UNCERTAIN, items должен быть пустым, total должен быть null.
         Если FOOD, оцени продукты, граммы и БЖУ приблизительно.
+        Если на фото цветы, человек, пустой стол, предметы интерьера, экран, животное или документ без еды - это NOT_FOOD.
+        Не придумывай блюдо. Если еды не видно явно, не возвращай FOOD.
         Формат:
         {"status":"FOOD|NOT_FOOD|UNCERTAIN","confidence":0.0,"message":"короткое сообщение по-русски","items":[{"name":"...","estimated_grams":100,"calories":120,"protein":10,"fat":3,"carbs":12}],"total":{"calories":120,"protein":10,"fat":3,"carbs":12}}
+        """
+    }
+
+    private var imageChatPrompt: String {
+        """
+        Ты персональный AI Fitness Coach. Отвечай по-русски и учитывай локальный fitness context.
+        Пользователь прикрепил изображение и может спрашивать о еде, калориях, белке, цели или просто "что здесь".
+        Если на фото еда, дай примерную оценку и явно напиши, что она может отличаться из-за неизвестного веса и состава.
+        Если еды нет, не придумывай блюдо. Скажи, что еды на фото не обнаружено, и кратко опиши видимый объект, если уверен.
         """
     }
 
@@ -200,7 +293,13 @@ final class OpenAIClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw AIClientError.from(error)
+        }
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AIClientError.emptyResponse
         }
@@ -217,7 +316,7 @@ final class OpenAIClient {
         guard let data = content.data(using: .utf8), let analysis = try? JSONDecoder().decode(FoodPhotoAnalysis.self, from: data) else {
             throw AIClientError.invalidStructuredResponse
         }
-        return analysis
+        return FoodAnalysisValidator.normalized(analysis)
     }
 }
 
@@ -244,7 +343,7 @@ private struct VisionChatCompletionRequest: Encodable {
     let model: String
     let messages: [VisionChatMessage]
     let temperature: Double
-    let responseFormat: ResponseFormat
+    let responseFormat: ResponseFormat?
 
     enum CodingKeys: String, CodingKey {
         case model

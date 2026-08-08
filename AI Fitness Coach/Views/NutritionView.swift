@@ -2,6 +2,7 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 import UIKit
+import UIKit
 
 struct NutritionView: View {
     @EnvironmentObject private var appState: AppState
@@ -115,7 +116,7 @@ struct NutritionView: View {
     }
 
     private var nutritionSummary: some View {
-        PremiumCard(padding: 16, radius: 22) {
+        PremiumCard(padding: 12, radius: 22) {
             ViewThatFits(in: .horizontal) {
                 nutritionSummaryWide
                 nutritionSummaryStacked
@@ -125,34 +126,37 @@ struct NutritionView: View {
 
     private var nutritionSummaryWide: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 18) {
-                CircularProgress(progress: totals.calories / targets.calories, tint: AppColors.green, lineWidth: 8, size: 124) {
+            HStack(alignment: .top, spacing: 10) {
+                CircularProgress(progress: totals.calories / targets.calories, tint: AppColors.green, lineWidth: 7, size: 92) {
                     VStack(spacing: 5) {
                         Text("Калории")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(AppColors.secondaryText)
                         Text("\(Int(totals.calories))")
-                            .font(.system(size: 29, weight: .bold))
+                            .font(.system(size: 25, weight: .bold))
                             .foregroundStyle(.white)
                         Text("/ \(Int(targets.calories)) ккал")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(AppColors.secondaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.65)
                     }
                 }
                 .overlay(alignment: .bottom) {
-                    Text("\(Int((totals.calories / targets.calories * 100).rounded()))% дневной нормы")
-                        .font(.system(size: 13, weight: .semibold))
+                    Text("\(Int((totals.calories / targets.calories * 100).rounded()))% нормы")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(AppColors.green)
-                        .offset(y: 34)
+                        .offset(y: 30)
                 }
 
-                VStack(spacing: 13) {
-                    HStack(alignment: .top, spacing: 12) {
+                VStack(spacing: 12) {
+                    HStack(alignment: .top, spacing: 8) {
                         MacroMini(title: "Белки", value: "\(Int(totals.protein))", target: "\(Int(targets.protein)) г", progress: totals.protein / targets.protein, tint: AppColors.purple)
+                            .frame(width: 70, alignment: .leading)
                         MacroMini(title: "Жиры", value: "\(Int(totals.fat))", target: "\(Int(targets.fat)) г", progress: totals.fat / targets.fat, tint: AppColors.purple)
+                            .frame(width: 70, alignment: .leading)
                         MacroMini(title: "Углеводы", value: "\(Int(totals.carbs))", target: "\(Int(targets.carbs)) г", progress: totals.carbs / targets.carbs, tint: AppColors.yellow)
+                            .frame(width: 70, alignment: .leading)
                     }
                     Divider().background(Color.white.opacity(0.12))
                     Button {
@@ -170,10 +174,11 @@ struct NutritionView: View {
                             Image(systemName: "chevron.right")
                                 .foregroundStyle(AppColors.mutedText)
                         }
+                        .frame(width: 226)
                     }
                     .buttonStyle(.plain)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(width: 226, alignment: .leading)
             }
         }
     }
@@ -224,7 +229,7 @@ struct NutritionView: View {
     }
 
     private var quickAddGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 78), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 82), spacing: 8)], spacing: 8) {
             QuickActionCard(icon: "camera", title: "Фото еды", subtitle: "ИИ распознает\nблюдо", tint: AppColors.green) { activeSheet = .photo }
             QuickActionCard(icon: "mic", title: "Голосом", subtitle: "Просто скажи,\nчто съел", tint: AppColors.purple) { activeSheet = .voice }
             QuickActionCard(icon: "pencil", title: "Вручную", subtitle: "Ввести продукты\nсамому", tint: AppColors.blue) { activeSheet = .manual }
@@ -361,26 +366,31 @@ private struct MacroMini: View {
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white.opacity(0.82))
                 .frame(height: 18, alignment: .bottomLeading)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
-                    .font(.system(size: 21, weight: .semibold))
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .layoutPriority(1)
                 Text("/ \(target)")
-                    .font(.system(size: 12, weight: .regular))
+                    .font(.system(size: 11, weight: .regular))
                     .foregroundStyle(AppColors.secondaryText)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.65)
             }
+            .lineLimit(1)
+            .allowsTightening(true)
             .frame(height: 28, alignment: .bottomLeading)
             GradientProgressBar(progress: progress, tint: tint, height: 7)
                 .frame(maxWidth: .infinity)
             Text("\(Int((progress * 100).rounded()))% цели")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(AppColors.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -494,6 +504,7 @@ private struct PhotoFoodSheet: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var image: UIImage?
     @State private var imageData: Data?
+    @State private var showCamera = false
     @State private var analysis: FoodPhotoAnalysis?
     @State private var isAnalyzing = false
     @State private var errorMessage: String?
@@ -532,22 +543,48 @@ private struct PhotoFoodSheet: View {
             }
 
             HStack {
-                PhotosPicker(selection: $pickerItem, matching: .images) {
-                    Label("Выбрать фото", systemImage: "photo")
+                Button {
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        showCamera = true
+                    } else {
+                        errorMessage = "Камера недоступна на этом устройстве."
+                    }
+                } label: {
+                    Label("Камера", systemImage: "camera")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .tint(AppColors.green)
 
-                Button {
-                    Task { await analyze() }
-                } label: {
-                    Label(isAnalyzing ? "Анализ..." : "Анализировать", systemImage: "sparkles")
+                PhotosPicker(selection: $pickerItem, matching: .images) {
+                    Label("Photos", systemImage: "photo")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
+                .tint(AppColors.green)
+            }
+
+            Button {
+                Task { await analyze() }
+            } label: {
+                Label(isAnalyzing ? "Анализ..." : "Анализировать", systemImage: "sparkles")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppColors.purple)
+            .disabled(imageData == nil || isAnalyzing)
+
+            HStack(spacing: 10) {
+                Button {
+                    analysis = nil
+                    image = nil
+                    imageData = nil
+                    errorMessage = nil
+                } label: {
+                    Label("Очистить", systemImage: "xmark.circle")
+                }
+                .buttonStyle(.bordered)
                 .tint(AppColors.purple)
-                .disabled(imageData == nil || isAnalyzing)
             }
 
             if let errorMessage {
@@ -609,11 +646,17 @@ private struct PhotoFoodSheet: View {
         .onChange(of: pickerItem) { _, newItem in
             Task {
                 guard let data = try? await newItem?.loadTransferable(type: Data.self), let uiImage = UIImage(data: data) else { return }
-                imageData = data
-                image = uiImage
-                analysis = nil
-                errorMessage = nil
+                setSelectedImage(uiImage)
             }
+        }
+        .sheet(isPresented: $showCamera) {
+            CameraPicker { captured in
+                setSelectedImage(captured)
+                showCamera = false
+            } onCancel: {
+                showCamera = false
+            }
+            .ignoresSafeArea()
         }
     }
 
@@ -633,6 +676,18 @@ private struct PhotoFoodSheet: View {
                 fat = "\(Int(total.fat))"
                 carbs = "\(Int(total.carbs))"
             }
+        } catch {
+            errorMessage = AIClientError.from(error).localizedDescription
+        }
+    }
+
+    private func setSelectedImage(_ uiImage: UIImage) {
+        do {
+            let payload = try ImagePreparationService.prepareJPEG(from: uiImage)
+            imageData = payload.data
+            image = uiImage
+            analysis = nil
+            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -732,18 +787,19 @@ private struct VoiceFoodSheet: View {
     }
 
     private func parse() async {
-        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else {
+        let text = VoiceTranscript.normalizedForFoodParsing(transcript)
+        guard VoiceTranscript.isParseable(text) else {
             errorMessage = "Не удалось распознать речь."
             return
         }
+        transcript = text
         isParsing = true
         errorMessage = nil
         defer { isParsing = false }
         do {
             analysis = try await appState.aiClient.parseFoodText(text, context: "Пользователь добавляет прием пищи голосом.")
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = AIClientError.from(error).localizedDescription
         }
     }
 }

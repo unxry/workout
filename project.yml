@@ -25,6 +25,7 @@ targets:
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: AI Fitness Coach reads selected photos to analyze food and answer questions about images you attach.
         INFOPLIST_KEY_NSMicrophoneUsageDescription: AI Fitness Coach uses the microphone for voice food logging and voice messages to the AI coach.
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: AI Fitness Coach uses speech recognition to transcribe your voice before sending or parsing it.
+        INFOPLIST_KEY_NSFaceIDUsageDescription: AI Fitness Coach uses Face ID to protect your profile and fitness data when you enable app lock.
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         SDKROOT: iphoneos
         SUPPORTED_PLATFORMS: iphoneos iphonesimulator
@@ -42,15 +43,30 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+  AI Fitness CoachUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    supportedDestinations:
+      - iOS
+    sources:
+      - path: AI Fitness CoachUITests
+    dependencies:
+      - target: AI Fitness Coach
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.unxry.aifitnesscoach.uitests
 schemes:
   AI Fitness Coach:
     build:
       targets:
         AI Fitness Coach: all
         AI Fitness CoachTests: [test]
+        AI Fitness CoachUITests: [test]
     test:
       targets:
         - AI Fitness CoachTests
+        - AI Fitness CoachUITests
     run:
       config: Debug
     archive:

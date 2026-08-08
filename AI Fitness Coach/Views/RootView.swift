@@ -70,10 +70,11 @@ private struct AIQuickComposerSheet: View {
     var body: some View {
         ZStack {
             PremiumBackground()
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text("Задать вопрос ИИ")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 TextField("Напиши вопрос тренеру...", text: $prompt, axis: .vertical)
                     .lineLimit(3...6)
@@ -82,6 +83,7 @@ private struct AIQuickComposerSheet: View {
                     .foregroundStyle(.white)
                     .padding(16)
                     .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white.opacity(0.075)))
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 PremiumButton(title: "Спросить ИИ", icon: "paperplane.fill", tint: AppColors.purple) {
                     let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -89,40 +91,52 @@ private struct AIQuickComposerSheet: View {
                     submit(text)
                 }
 
-                Text("Быстрые запросы")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
+                openFullChatButton
 
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 142), spacing: 10)], spacing: 10) {
-                    quickPrompt("Спросить про питание", "Что мне лучше съесть сегодня вечером?")
-                    quickPrompt("Спросить про тренировку", "Какую тренировку сделать сегодня с учетом моего прогресса?")
-                    quickPrompt("Разобрать прогресс", "Проанализируй мой вес и прогресс за последнее время.")
-                    quickPrompt("Оценить фото", "Я хочу отправить фото еды и оценить калории.")
-                    quickPrompt("Плато веса", "Почему вес может стоять и что изменить без голодовки?")
-                    quickPrompt("Белок", "Сколько белка мне осталось и чем его добрать?")
-                }
-
-                Button {
-                    Haptics.tap()
-                    openChat()
-                } label: {
-                    HStack {
-                        IconBadge(systemName: "robot", tint: AppColors.purple, size: 44)
-                        Text("Открыть полный чат")
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Быстрые запросы")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(AppColors.mutedText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 148), spacing: 10)], spacing: 10) {
+                            quickPrompt("Спросить про питание", "Что мне лучше съесть сегодня вечером?")
+                            quickPrompt("Спросить про тренировку", "Какую тренировку сделать сегодня с учетом моего прогресса?")
+                            quickPrompt("Разобрать прогресс", "Проанализируй мой вес и прогресс за последнее время.")
+                            quickPrompt("Оценить фото", "Я хочу отправить фото еды и оценить калории.")
+                            quickPrompt("Плато веса", "Почему вес может стоять и что изменить без голодовки?")
+                            quickPrompt("Белок", "Сколько белка мне осталось и чем его добрать?")
+                        }
                     }
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white.opacity(0.060)))
+                    .padding(.bottom, 10)
                 }
-                .buttonStyle(.plain)
-                Spacer()
             }
             .padding(22)
         }
+    }
+
+    private var openFullChatButton: some View {
+        Button {
+            Haptics.tap()
+            openChat()
+        } label: {
+            HStack(spacing: 12) {
+                IconBadge(systemName: "sparkles", tint: AppColors.purple, size: 44)
+                Text("Открыть полный чат")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(AppColors.mutedText)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white.opacity(0.060)))
+        }
+        .buttonStyle(.plain)
     }
 
     private func quickPrompt(_ title: String, _ text: String) -> some View {

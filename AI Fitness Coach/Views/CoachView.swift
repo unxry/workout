@@ -9,6 +9,8 @@ struct CoachView: View {
     @Query(sort: \UserProfile.createdAt) private var profiles: [UserProfile]
     @Query(sort: \MealEntry.date, order: .reverse) private var meals: [MealEntry]
     @Query(sort: \CoachMemory.createdAt, order: .reverse) private var memories: [CoachMemory]
+    @Query(sort: \DailyMetric.date) private var metrics: [DailyMetric]
+    @Query(sort: \WorkoutLog.date, order: .reverse) private var workouts: [WorkoutLog]
 
     @StateObject private var speech = SpeechRecognitionService()
     @State private var message = ""
@@ -20,6 +22,9 @@ struct CoachView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var attachedImage: UIImage?
     @State private var attachedImageData: Data?
+    @State private var showImageSourceDialog = false
+    @State private var showCamera = false
+    @State private var inputError: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,14 +51,34 @@ struct CoachView: View {
             Task {
                 guard let data = try? await newItem?.loadTransferable(type: Data.self),
                       let image = UIImage(data: data) else { return }
-                attachedImageData = data
-                attachedImage = image
+                setAttachedImage(image)
             }
         }
         .onChange(of: speech.transcript) { _, transcript in
             if speech.isRecording || !transcript.isEmpty {
                 message = transcript
             }
+        }
+        .onChange(of: speech.errorMessage) { _, value in
+            inputError = value
+        }
+        .confirmationDialog("Добавить изображение", isPresented: $showImageSourceDialog, titleVisibility: .visible) {
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("Camera") { showCamera = true }
+            }
+            PhotosPicker(selection: $pickerItem, matching: .images) {
+                Text("Photo Library")
+            }
+            Button("Отмена", role: .cancel) {}
+        }
+        .sheet(isPresented: $showCamera) {
+            CameraPicker { captured in
+                setAttachedImage(captured)
+                showCamera = false
+            } onCancel: {
+                showCamera = false
+            }
+            .ignoresSafeArea()
         }
         .onAppear {
             if let prompt = appState.consumePendingCoachPrompt() {
@@ -70,21 +95,39 @@ struct CoachView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("ИИ-помощник")
-                    .font(.system(size: 38, weight: .bold))
-                    .foregroundStyle(.white)
-                HStack(spacing: 7) {
-                    Circle().fill(AppColors.green).frame(width: 12, height: 12)
-                    Text(appState.apiKeyStatus == .configured ? "Онлайн" : "Offline • нужен API key")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.84))
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                headerTitle
+                    .layoutPriority(1)
+                AIHelperButton(title: "История чатов", systemImage: "clock.arrow.circlepath") {
+                    showHistory = true
                 }
             }
-            Spacer()
-            AIHelperButton(title: "История чатов", systemImage: "clock.arrow.circlepath") {
-                showHistory = true
+
+            VStack(alignment: .leading, spacing: 14) {
+                headerTitle
+                AIHelperButton(title: "История чатов", systemImage: "clock.arrow.circlepath") {
+                    showHistory = true
+                }
+            }
+        }
+    }
+
+    private var headerTitle: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("ИИ-помощник")
+                .font(.system(size: 36, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 7) {
+                Circle().fill(AppColors.green).frame(width: 12, height: 12)
+                Text(appState.apiKeyStatus == .configured ? "Онлайн" : "Offline • нужен API key")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.84))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             }
         }
     }
@@ -215,13 +258,25 @@ struct CoachView: View {
                 .padding(.horizontal, 10)
             }
 
+            if let inputError {
+                Text(inputError)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(AppColors.yellow)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack(spacing: 10) {
-                PhotosPicker(selection: $pickerItem, matching: .images) {
-                Image(systemName: "plus")
-                    .font(.system(size: 25, weight: .regular))
-                    .foregroundStyle(.white)
-                    .frame(width: 52, height: 52)
-                    .background(Circle().fill(Color.white.opacity(0.070)).overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1)))
+                Button {
+                    Haptics.tap()
+                    showImageSourceDialog = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 25, weight: .regular))
+                        .foregroundStyle(.white)
+                        .frame(width: 52, height: 52)
+                        .background(Circle().fill(Color.white.opacity(0.070)).overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1)))
                 }
                 .buttonStyle(.plain)
 
@@ -240,6 +295,7 @@ struct CoachView: View {
                     if speech.isRecording {
                         speech.stop()
                     } else {
+                        inputError = nil
                         Task { await speech.start() }
                     }
                 } label: {
@@ -325,13 +381,12 @@ struct CoachView: View {
         let answer: String
         do {
             if let imageData {
-                let analysis = try await appState.aiClient.analyzeFoodImage(imageData: imageData, context: context.profileSummary + " | " + context.todayNutrition + " | вопрос: " + text)
-                answer = formatFoodAnalysis(analysis)
+                answer = try await appState.aiClient.answerWithImage(imageData: imageData, context: context)
             } else {
                 answer = try await appState.aiClient.answer(context: context)
             }
         } catch {
-            answer = error.localizedDescription
+            answer = AIClientError.from(error).localizedDescription
         }
 
         modelContext.insert(CoachMemory(kind: "chat", content: "Пользователь: \(text). Ответ: \(answer)", importance: 0.6))
@@ -340,6 +395,17 @@ struct CoachView: View {
         conversation.append(.init(role: .coach, text: answer, time: "сейчас"))
         isThinking = false
         Haptics.success()
+    }
+
+    private func setAttachedImage(_ image: UIImage) {
+        do {
+            let payload = try ImagePreparationService.prepareJPEG(from: image)
+            attachedImageData = payload.data
+            attachedImage = image
+            inputError = nil
+        } catch {
+            inputError = error.localizedDescription
+        }
     }
 
     private func formatFoodAnalysis(_ analysis: FoodPhotoAnalysis) -> String {
@@ -368,14 +434,26 @@ struct CoachView: View {
     private func buildContext(userMessage: String) -> CoachContext {
         let profile = profiles.first
         let targets = profile.map { NutritionCalculator.targets(for: $0) }
-        let todayMeals = meals.filter { Calendar.current.isDateInToday($0.date) }
+        let calendar = Calendar.current
+        let todayMeals = meals.filter { calendar.isDateInToday($0.date) }
         let calories = todayMeals.reduce(0) { $0 + $1.calories }
         let protein = todayMeals.reduce(0) { $0 + $1.protein }
+        let fat = todayMeals.reduce(0) { $0 + $1.fat }
+        let carbs = todayMeals.reduce(0) { $0 + $1.carbs }
+        let latestMetric = metrics.last
+        let mealSummary = todayMeals.prefix(5).map { "\($0.title): \(Int($0.calories)) ккал" }.joined(separator: "; ")
+        let workoutSummary = workouts.prefix(3).map { "\($0.title), \($0.durationMinutes) мин, \(Int($0.calories)) ккал" }.joined(separator: "; ")
+        let trendSummary: String
+        if let first = metrics.suffix(7).first, let last = metrics.suffix(7).last {
+            trendSummary = "вес \(String(format: "%.1f", first.weightKg)) -> \(String(format: "%.1f", last.weightKg)) кг за последние записи"
+        } else {
+            trendSummary = "недостаточно записей веса для тренда"
+        }
 
         return CoachContext(
-            profileSummary: profile.map { "\($0.name), цель \($0.goal.rawValue), вес \($0.currentWeightKg), цель \($0.targetWeightKg)" } ?? "Профиль еще не заполнен",
-            todayNutrition: targets.map { "\(Int(calories))/\(Int($0.calories)) ккал, белок \(Int(protein))/\(Int($0.protein)) г" } ?? "Нет цели",
-            recentTrend: "Локальные записи веса используются для оценки плато и скорости прогресса.",
+            profileSummary: profile.map { "\($0.name), цель \($0.goal.rawValue), вес \($0.currentWeightKg), целевой вес \($0.targetWeightKg), рост \($0.heightCm), тренировок/нед \($0.trainingDaysPerWeek)" } ?? "Профиль еще не заполнен",
+            todayNutrition: targets.map { "цель \(Int($0.calories)) ккал; съедено \(Int(calories)) ккал; Б \(Int(protein))/\(Int($0.protein)) г; Ж \(Int(fat))/\(Int($0.fat)) г; У \(Int(carbs))/\(Int($0.carbs)) г; вода цель \(String(format: "%.1f", $0.waterLiters)) л; последние приемы: \(mealSummary.isEmpty ? "нет записей" : mealSummary)" } ?? "Нет цели",
+            recentTrend: "\(trendSummary); шаги \(Int(latestMetric?.steps ?? 0)); вода \(String(format: "%.1f", latestMetric?.waterLiters ?? 0)) л; сон \(String(format: "%.1f", latestMetric?.sleepHours ?? 0)) ч; последние тренировки: \(workoutSummary.isEmpty ? "нет записей" : workoutSummary)",
             memories: memories.prefix(8).map(\.content),
             userMessage: userMessage
         )
@@ -452,7 +530,7 @@ private struct AIAvatarLarge: View {
         ZStack {
             Circle().fill(Color.white.opacity(0.08))
             Circle().fill(AppColors.purple.opacity(0.12)).padding(8)
-            Image(systemName: "robot")
+            Image(systemName: "sparkles")
                 .font(.system(size: 58, weight: .bold))
                 .foregroundStyle(LinearGradient(colors: [.white, AppColors.purple], startPoint: .top, endPoint: .bottom))
         }
@@ -463,7 +541,7 @@ private struct AIAvatarLarge: View {
 
 private struct AIAvatarDot: View {
     var body: some View {
-        Image(systemName: "robot")
+        Image(systemName: "sparkles")
             .font(.system(size: 22, weight: .bold))
             .foregroundStyle(AppColors.purple)
             .frame(width: 42, height: 42)

@@ -133,32 +133,48 @@ struct PageHeader: View {
     let title: String
     var subtitle: String?
     var aiTitle: String = "ИИ-помощник"
-    var aiIcon: String = "robot"
+    var aiIcon: String = "sparkles"
     var aiAction: () -> Void
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(title)
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundStyle(.white)
-                    .minimumScaleFactor(0.8)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(AppColors.secondaryText)
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top) {
+                titleBlock
+                Spacer(minLength: 16)
+                AIHelperButton(title: aiTitle, systemImage: aiIcon, action: aiAction)
+                    .padding(.top, 4)
             }
-            Spacer(minLength: 16)
-            AIHelperButton(title: aiTitle, systemImage: aiIcon, action: aiAction)
-                .padding(.top, 4)
+
+            VStack(alignment: .leading, spacing: 14) {
+                titleBlock
+                AIHelperButton(title: aiTitle, systemImage: aiIcon, action: aiAction)
+            }
+        }
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 38, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .allowsTightening(true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(AppColors.secondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }
 
 struct AIHelperButton: View {
     let title: String
-    var systemImage: String = "robot"
+    var systemImage: String = "sparkles"
     let action: () -> Void
 
     var body: some View {
@@ -186,6 +202,8 @@ struct AIHelperButton: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier("ai.helper.\(title)")
     }
 }
 
@@ -197,8 +215,8 @@ struct MetricCard: View {
     let tint: Color
 
     var body: some View {
-        PremiumCard(padding: 16, radius: 19) {
-            VStack(alignment: .leading, spacing: 10) {
+        PremiumCard(padding: 14, radius: 19) {
+            VStack(alignment: .leading, spacing: 9) {
                 Text(title)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(AppColors.secondaryText)
@@ -218,13 +236,15 @@ struct MetricCard: View {
 
                 GradientProgressBar(progress: progress, tint: tint, height: 7)
 
-                Text("\(Int((progress * 100).rounded()))%")
+                Text("\(Int((progress * 100).rounded()))% цели")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(AppColors.secondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(minHeight: 122)
+        .frame(minHeight: 108)
     }
 }
 
@@ -317,21 +337,21 @@ struct QuickActionCard: View {
             Haptics.tap()
             action()
         } label: {
-            PremiumCard(padding: 14, radius: 18) {
-                VStack(spacing: 12) {
+            PremiumCard(padding: 10, radius: 18) {
+                VStack(spacing: 10) {
                     IconBadge(systemName: icon, tint: tint, size: 54)
                     Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.82)
+                        .minimumScaleFactor(0.70)
                     Text(subtitle)
-                    .font(.system(size: 12, weight: .regular))
+                    .font(.system(size: 11, weight: .regular))
                         .foregroundStyle(AppColors.secondaryText)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.78)
+                        .minimumScaleFactor(0.70)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 124)
@@ -359,6 +379,9 @@ struct PremiumButton: View {
                 }
                 Text(title)
                     .font(.system(size: 17, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.74)
+                    .allowsTightening(true)
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 22)
@@ -435,6 +458,8 @@ struct PremiumTabBar: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("AI quick composer")
+        .accessibilityIdentifier("tab.plus.ai")
     }
 
     private func tabButton(_ tab: CoachTab) -> some View {
@@ -457,6 +482,8 @@ struct PremiumTabBar: View {
             .clipped()
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(tab.title)
+        .accessibilityIdentifier("tab.\(tab.rawValue)")
     }
 }
 

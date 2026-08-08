@@ -84,8 +84,14 @@ final class SpeechRecognitionService: ObservableObject {
         }
 
         let micAllowed = await withCheckedContinuation { continuation in
-            AVAudioSession.sharedInstance().requestRecordPermission { allowed in
-                continuation.resume(returning: allowed)
+            if #available(iOS 17.0, *) {
+                AVAudioApplication.requestRecordPermission { allowed in
+                    continuation.resume(returning: allowed)
+                }
+            } else {
+                AVAudioSession.sharedInstance().requestRecordPermission { allowed in
+                    continuation.resume(returning: allowed)
+                }
             }
         }
         guard micAllowed else {
@@ -99,5 +105,19 @@ final class SpeechRecognitionService: ObservableObject {
         }
 
         return true
+    }
+}
+
+enum VoiceTranscript {
+    static func normalizedForFoodParsing(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\n", with: " ")
+            .split(separator: " ")
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func isParseable(_ text: String) -> Bool {
+        !normalizedForFoodParsing(text).isEmpty
     }
 }

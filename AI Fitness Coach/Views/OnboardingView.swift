@@ -81,6 +81,7 @@ struct OnboardingView: View {
                         .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("onboarding.createPlan")
             }
             .padding(22)
             .padding(.top, 32)

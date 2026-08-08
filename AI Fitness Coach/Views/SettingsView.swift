@@ -321,7 +321,7 @@ enum ProfileSheet: String, CaseIterable, Identifiable {
         case .training: "dumbbell"
         case .health: "heart"
         case .notifications: "bell"
-        case .ai: "robot"
+        case .ai: "sparkles"
         case .security: "lock"
         case .privacy: "shield"
         case .about: "info.circle"
@@ -459,12 +459,17 @@ private struct AIAPISettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var key = ""
     @State private var status = ""
+    @State private var isTesting = false
 
     var body: some View {
         FoodFormShell(title: "ИИ и API") {
             Text("AI Provider: OpenAI")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
+            Text(appState.apiKeyStatus.isConfigured ? "Ключ сохранен в Keychain." : "Ключ не добавлен. AI-функции покажут понятное сообщение вместо фейкового ответа.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(AppColors.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
             SecureField("OpenAI API Key", text: $key)
                 .textFieldStyle(.plain)
                 .font(.system(size: 16, weight: .medium))
@@ -475,22 +480,31 @@ private struct AIAPISettingsSheet: View {
                 Button("Сохранить") {
                     appState.saveOpenAIKey(key)
                     key = ""
-                    status = "Подключено"
+                    status = appState.apiKeyStatus.isConfigured ? "Ключ сохранен" : "Ключ не добавлен"
                 }
                 Button("Удалить ключ") {
                     appState.saveOpenAIKey("")
+                    key = ""
                     status = "Ключ удален"
                 }
-                Button("Проверить") {
+                Button(isTesting ? "Проверяю..." : "Проверить") {
                     Task {
+                        let typedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !typedKey.isEmpty {
+                            appState.saveOpenAIKey(typedKey)
+                            key = ""
+                        }
+                        isTesting = true
+                        defer { isTesting = false }
                         do {
                             try await appState.aiClient.testConnection()
                             status = "Подключено"
                         } catch {
-                            status = error.localizedDescription
+                            status = AIClientError.from(error).localizedDescription
                         }
                     }
                 }
+                .disabled(isTesting)
             }
             .buttonStyle(.bordered)
             .tint(AppColors.purple)

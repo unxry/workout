@@ -324,17 +324,26 @@ private struct WorkoutExerciseRow: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .allowsTightening(true)
                 Text(exercise.subtitle)
                     .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(AppColors.secondaryText)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .allowsTightening(true)
             }
+            .layoutPriority(1)
             Spacer()
             Text(exercise.weight)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(2)
             Image(systemName: "chevron.right")
                 .foregroundStyle(AppColors.mutedText)
+                .fixedSize()
         }
         .padding(10)
         .background(
@@ -460,7 +469,9 @@ private struct ActiveWorkoutView: View {
                             engine.pause()
                         }
                     }
+                    .accessibilityIdentifier(engine.phase == .paused ? "activeWorkout.resume" : "activeWorkout.pause")
                     Button("Finish") { completeWorkout() }
+                        .accessibilityIdentifier("activeWorkout.finish")
                 }
                 .buttonStyle(.bordered)
                 .tint(AppColors.purple)
@@ -530,13 +541,16 @@ private struct RestTimerSheet: View {
                 }
                 HStack {
                     Button("+30 sec") { countdown.add(30) }
+                        .accessibilityIdentifier("rest.add30")
                     Button(countdown.isPaused ? "Resume" : "Pause") {
                         countdown.isPaused ? countdown.resume() : countdown.pause()
                     }
+                    .accessibilityIdentifier(countdown.isPaused ? "rest.resume" : "rest.pause")
                     Button("Skip") {
                         onComplete()
                         dismiss()
                     }
+                    .accessibilityIdentifier("rest.skip")
                 }
                 .buttonStyle(.bordered)
                 .tint(AppColors.purple)

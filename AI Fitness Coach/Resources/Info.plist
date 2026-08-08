@@ -32,6 +32,8 @@
 	<string>AI Fitness Coach uses the microphone for voice food logging and voice messages to the AI coach.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>AI Fitness Coach uses speech recognition to transcribe your voice before sending or parsing it.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>AI Fitness Coach uses Face ID to protect your profile and fitness data when you enable app lock.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

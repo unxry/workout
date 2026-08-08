@@ -35,6 +35,20 @@
                ReferencedContainer = "container:AI Fitness Coach.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "590AE8B70D69EA6D235D7516"
+               BuildableName = "AI Fitness CoachUITests.xctest"
+               BlueprintName = "AI Fitness CoachUITests"
+               ReferencedContainer = "container:AI Fitness Coach.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -61,6 +75,17 @@
                BlueprintIdentifier = "DF8B3A96B4A3ABBAB494668E"
                BuildableName = "AI Fitness CoachTests.xctest"
                BlueprintName = "AI Fitness CoachTests"
+               ReferencedContainer = "container:AI Fitness Coach.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "590AE8B70D69EA6D235D7516"
+               BuildableName = "AI Fitness CoachUITests.xctest"
+               BlueprintName = "AI Fitness CoachUITests"
                ReferencedContainer = "container:AI Fitness Coach.xcodeproj">
             </BuildableReference>
          </TestableReference>

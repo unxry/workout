@@ -13,7 +13,7 @@ final class AppState: ObservableObject {
     let notifications = NotificationService()
 
     init() {
-        apiKeyStatus = KeychainStore.shared.readOpenAIKey().isEmpty ? .missing : .configured
+        apiKeyStatus = APIKeyStatus.fromStoredKey(KeychainStore.shared.readOpenAIKey())
     }
 
     func saveOpenAIKey(_ key: String) {
@@ -37,6 +37,14 @@ enum APIKeyStatus {
     case unknown
     case missing
     case configured
+
+    static func fromStoredKey(_ key: String) -> APIKeyStatus {
+        key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .missing : .configured
+    }
+
+    var isConfigured: Bool {
+        self == .configured
+    }
 }
 
 enum HealthAuthorizationState {
@@ -68,7 +76,7 @@ enum CoachTab: String, CaseIterable, Identifiable {
         switch self {
         case .home: "house"
         case .nutrition: "fork.knife"
-        case .coach: "robot"
+        case .coach: "sparkles"
         case .progress: "dumbbell"
         case .profile: "person"
         }
