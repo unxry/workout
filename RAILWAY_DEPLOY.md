@@ -51,6 +51,13 @@ Service settings:
 - Builder: Dockerfile
 - Public networking: Generate Domain
 
+If Railway/Nixpacks ignores the Dockerfile, set the commands manually:
+
+```text
+Build Command: npm run build
+Start Command: npm run preview -- --host 0.0.0.0 --port $PORT
+```
+
 Web build variable:
 
 ```env

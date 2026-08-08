@@ -12,6 +12,7 @@
     "dev:bot": ". .venv/bin/activate 2>/dev/null || true; cd apps/api && python -m app.bot.polling",
     "dev:all": "npm-run-all --parallel dev:web dev:api dev:bot",
     "build": "npm --workspace apps/web run build",
+    "start": "npm --workspace apps/web run preview -- --host 0.0.0.0 --port ${PORT:-5173}",
     "lint": "npm --workspace apps/web run lint",
     "test": "npm --workspace apps/web run typecheck && sh -c '. .venv/bin/activate 2>/dev/null || true; cd apps/api && pytest'",
     "install:api": "python3 -m venv .venv && . .venv/bin/activate && pip install -r apps/api/requirements.txt"

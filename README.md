@@ -75,6 +75,8 @@ For the simplest production launch, use Railway with two services from this repo
 
 See [RAILWAY_DEPLOY.md](RAILWAY_DEPLOY.md) for exact settings and environment variables.
 
+If Railway reports `Missing script: "build"`, the service is pointed at the wrong root directory or an old commit. The web service root must be `apps/web`, or it must use the root package scripts from the latest `main` branch.
+
 ## Production With Docker Compose
 
 ```bash
