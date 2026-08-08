@@ -11,13 +11,13 @@ struct NutritionView: View {
 
     @State private var activeSheet: NutritionSheet?
     @State private var mealMessage = ""
+    @State private var selectedDate = Date()
+    @State private var showDatePicker = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 22) {
-                PageHeader(title: "Питание", subtitle: "Сегодня⌄") {
-                    appState.selectedTab = .coach
-                }
+                nutritionHeader
 
                 nutritionSummary
 
@@ -47,6 +47,16 @@ struct NutritionView: View {
                 SimpleInfoSheet(title: "Все приемы пищи", rows: mealRows.map { "\($0.type) • \($0.title) • \(Int($0.calories)) ккал" })
             }
         }
+        .sheet(isPresented: $showDatePicker) {
+            FoodFormShell(title: "Выбрать день") {
+                DatePicker("День", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .tint(AppColors.purple)
+                PremiumButton(title: "Готово", icon: "checkmark", tint: AppColors.green) {
+                    showDatePicker = false
+                }
+            }
+        }
         .alert("Готово", isPresented: Binding(get: { !mealMessage.isEmpty }, set: { if !$0 { mealMessage = "" } })) {
             Button("OK") { mealMessage = "" }
         } message: {
@@ -55,6 +65,36 @@ struct NutritionView: View {
     }
 
     private var profile: UserProfile? { profiles.first }
+
+    private var nutritionHeader: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Питание")
+                    .font(.system(size: 42, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                Button {
+                    Haptics.tap()
+                    showDatePicker = true
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(Calendar.current.isDateInToday(selectedDate) ? "Сегодня" : selectedDate.formatted(date: .numeric, time: .omitted))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+            AIHelperButton(title: "ИИ-помощник") {
+                appState.selectedTab = .coach
+            }
+            .padding(.top, 10)
+        }
+    }
     private var targets: NutritionTargets {
         if let profile { return NutritionCalculator.targets(for: profile) }
         return NutritionTargets(bmr: 1650, tdee: 2600, calories: 2200, protein: 160, fat: 70, carbs: 240, waterLiters: 2.5, weeklyWeightDelta: -0.4, goalDate: .now)
@@ -76,7 +116,16 @@ struct NutritionView: View {
 
     private var nutritionSummary: some View {
         PremiumCard(padding: 16, radius: 22) {
-            HStack(spacing: 14) {
+            ViewThatFits(in: .horizontal) {
+                nutritionSummaryWide
+                nutritionSummaryStacked
+            }
+        }
+    }
+
+    private var nutritionSummaryWide: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 18) {
                 CircularProgress(progress: totals.calories / targets.calories, tint: AppColors.green, lineWidth: 8, size: 124) {
                     VStack(spacing: 5) {
                         Text("Калории")
@@ -92,9 +141,15 @@ struct NutritionView: View {
                             .minimumScaleFactor(0.65)
                     }
                 }
+                .overlay(alignment: .bottom) {
+                    Text("\(Int((totals.calories / targets.calories * 100).rounded()))% дневной нормы")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppColors.green)
+                        .offset(y: 34)
+                }
 
                 VStack(spacing: 13) {
-                    HStack(spacing: 10) {
+                    HStack(alignment: .top, spacing: 12) {
                         MacroMini(title: "Белки", value: "\(Int(totals.protein))", target: "\(Int(targets.protein)) г", progress: totals.protein / targets.protein, tint: AppColors.purple)
                         MacroMini(title: "Жиры", value: "\(Int(totals.fat))", target: "\(Int(targets.fat)) г", progress: totals.fat / targets.fat, tint: AppColors.purple)
                         MacroMini(title: "Углеводы", value: "\(Int(totals.carbs))", target: "\(Int(targets.carbs)) г", progress: totals.carbs / targets.carbs, tint: AppColors.yellow)
@@ -118,17 +173,58 @@ struct NutritionView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text("\(Int((totals.calories / targets.calories * 100).rounded()))%")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(AppColors.green)
-                .padding(.leading, 58)
-                .padding(.top, -6)
+        }
+    }
+
+    private var nutritionSummaryStacked: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 18) {
+                CircularProgress(progress: totals.calories / targets.calories, tint: AppColors.green, lineWidth: 8, size: 118) {
+                    VStack(spacing: 5) {
+                        Text("Калории")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(AppColors.secondaryText)
+                        Text("\(Int(totals.calories))")
+                            .font(.system(size: 29, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text("/ \(Int(targets.calories)) ккал")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(AppColors.secondaryText)
+                    }
+                }
+                Text("\(Int((totals.calories / targets.calories * 100).rounded()))% дневной нормы")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(AppColors.green)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            VStack(spacing: 12) {
+                MacroMini(title: "Белки", value: "\(Int(totals.protein))", target: "\(Int(targets.protein)) г", progress: totals.protein / targets.protein, tint: AppColors.purple)
+                MacroMini(title: "Жиры", value: "\(Int(totals.fat))", target: "\(Int(targets.fat)) г", progress: totals.fat / targets.fat, tint: AppColors.purple)
+                MacroMini(title: "Углеводы", value: "\(Int(totals.carbs))", target: "\(Int(targets.carbs)) г", progress: totals.carbs / targets.carbs, tint: AppColors.yellow)
+            }
+            Button {
+                Haptics.tap()
+                activeSheet = .details
+            } label: {
+                HStack {
+                    Image(systemName: "star")
+                        .foregroundStyle(AppColors.purple)
+                    Text("Детали и цели")
+                        .foregroundStyle(.white.opacity(0.84))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(AppColors.mutedText)
+                }
+                .font(.system(size: 17, weight: .medium))
+            }
+            .buttonStyle(.plain)
         }
     }
 
     private var quickAddGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 78), spacing: 8)], spacing: 8) {
             QuickActionCard(icon: "camera", title: "Фото еды", subtitle: "ИИ распознает\nблюдо", tint: AppColors.green) { activeSheet = .photo }
             QuickActionCard(icon: "mic", title: "Голосом", subtitle: "Просто скажи,\nчто съел", tint: AppColors.purple) { activeSheet = .voice }
             QuickActionCard(icon: "pencil", title: "Вручную", subtitle: "Ввести продукты\nсамому", tint: AppColors.blue) { activeSheet = .manual }
@@ -168,6 +264,21 @@ struct NutritionView: View {
                 })
             }
 
+            if mealRows.isEmpty {
+                PremiumCard(padding: 18, radius: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Сегодня еще нет приемов пищи")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Text("Добавь еду фото, голосом, вручную или через поиск.")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(AppColors.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
             Button {
                 Haptics.tap()
                 activeSheet = .allMeals
@@ -197,12 +308,7 @@ struct NutritionView: View {
                 return MealDisplay(type: meta.type, time: timeString(meal.date), title: meal.title, calories: meal.calories, protein: meal.protein, fat: meal.fat, carbs: meal.carbs, icon: meta.icon, tint: meta.tint, thumbnail: meta.thumbnail, entry: meal)
             }
         }
-        return [
-            MealDisplay(type: "Завтрак", time: "08:30", title: "Омлет с овощами", calories: 420, protein: 32, fat: 15, carbs: 38, icon: "sunrise.fill", tint: AppColors.green, thumbnail: "🍳", entry: nil),
-            MealDisplay(type: "Обед", time: "13:20", title: "Куриная грудка с рисом", calories: 550, protein: 45, fat: 12, carbs: 55, icon: "sun.max.fill", tint: AppColors.purple, thumbnail: "🍗", entry: nil),
-            MealDisplay(type: "Ужин", time: "19:10", title: "Сёмга с овощами", calories: 510, protein: 38, fat: 22, carbs: 18, icon: "sunset.fill", tint: AppColors.orange, thumbnail: "🐟", entry: nil),
-            MealDisplay(type: "Перекусы", time: "16:45", title: "Творог с ягодами", calories: 180, protein: 18, fat: 4, carbs: 12, icon: "moon.fill", tint: AppColors.blue, thumbnail: "🫐", entry: nil)
-        ]
+        return []
     }
 
     private var mealMeta: [(type: String, icon: String, tint: Color, thumbnail: String)] {
@@ -259,6 +365,7 @@ private struct MacroMini: View {
             Text(title)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.white.opacity(0.82))
+                .frame(height: 18, alignment: .bottomLeading)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(.system(size: 21, weight: .semibold))
@@ -269,13 +376,14 @@ private struct MacroMini: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
+            .frame(height: 28, alignment: .bottomLeading)
             GradientProgressBar(progress: progress, tint: tint, height: 7)
-                .frame(width: 54)
-            Text("\(Int((progress * 100).rounded()))%")
+                .frame(maxWidth: .infinity)
+            Text("\(Int((progress * 100).rounded()))% цели")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(AppColors.secondaryText)
         }
-        .frame(width: 58, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -380,11 +488,21 @@ private struct ManualFoodSheet: View {
 }
 
 private struct PhotoFoodSheet: View {
+    @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     let onSave: (MealDraft) -> Void
     @State private var pickerItem: PhotosPickerItem?
     @State private var image: UIImage?
-    @State private var analyzed = false
+    @State private var imageData: Data?
+    @State private var analysis: FoodPhotoAnalysis?
+    @State private var isAnalyzing = false
+    @State private var errorMessage: String?
+    @State private var title = ""
+    @State private var grams = ""
+    @State private var calories = ""
+    @State private var protein = ""
+    @State private var fat = ""
+    @State private var carbs = ""
 
     var body: some View {
         FoodFormShell(title: "Фото еды") {
@@ -422,47 +540,114 @@ private struct PhotoFoodSheet: View {
                 .tint(AppColors.green)
 
                 Button {
-                    analyzed = true
+                    Task { await analyze() }
                 } label: {
-                    Label("Анализировать", systemImage: "sparkles")
+                    Label(isAnalyzing ? "Анализ..." : "Анализировать", systemImage: "sparkles")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(AppColors.purple)
+                .disabled(imageData == nil || isAnalyzing)
             }
 
-            if analyzed {
+            if let errorMessage {
                 PremiumCard(padding: 14, radius: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Найдено: омлет с овощами")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white)
-                        Text("Порция: ~280 г • 420 ккал • Б 32 г • Ж 15 г • У 38 г")
-                            .font(.system(size: 15, weight: .regular))
-                            .foregroundStyle(AppColors.secondaryText)
-                    }
+                    Text(errorMessage)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(AppColors.yellow)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                PremiumButton(title: "Подтвердить и сохранить", icon: "checkmark", tint: AppColors.green) {
-                    onSave(MealDraft(title: "Омлет с овощами", calories: 420, protein: 32, fat: 15, carbs: 38, source: "photo"))
-                    dismiss()
+            }
+
+            if let analysis {
+                if analysis.isFood {
+                    PremiumCard(padding: 14, radius: 16) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Примерная оценка")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Text(analysis.items.map { "\($0.name), ~\(Int($0.estimatedGrams)) г" }.joined(separator: "\n"))
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundStyle(AppColors.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if let total = analysis.total {
+                                Text("~\(Int(total.calories)) ккал • Б \(Int(total.protein)) г • Ж \(Int(total.fat)) г • У \(Int(total.carbs)) г")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
+                            Text("Оценка по фото может отличаться из-за неизвестного веса порции, способа приготовления и ингредиентов.")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(AppColors.yellow)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    PremiumTextField(placeholder: "Название", text: $title)
+                    PremiumTextField(placeholder: "Вес, г", text: $grams, keyboard: .decimalPad)
+                    PremiumTextField(placeholder: "Калории", text: $calories, keyboard: .decimalPad)
+                    HStack(spacing: 10) {
+                        PremiumTextField(placeholder: "Белок", text: $protein, keyboard: .decimalPad)
+                        PremiumTextField(placeholder: "Жиры", text: $fat, keyboard: .decimalPad)
+                        PremiumTextField(placeholder: "Углеводы", text: $carbs, keyboard: .decimalPad)
+                    }
+
+                    PremiumButton(title: "Подтвердить и сохранить", icon: "checkmark", tint: AppColors.green) {
+                        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                        onSave(MealDraft(title: title, calories: number(calories), protein: number(protein), fat: number(fat), carbs: number(carbs), source: "photo"))
+                        dismiss()
+                    }
+                } else {
+                    PremiumCard(padding: 14, radius: 16) {
+                        Text(analysis.message.isEmpty ? "На фотографии не удалось обнаружить еду." : analysis.message)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(AppColors.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
         .onChange(of: pickerItem) { _, newItem in
             Task {
                 guard let data = try? await newItem?.loadTransferable(type: Data.self), let uiImage = UIImage(data: data) else { return }
+                imageData = data
                 image = uiImage
-                analyzed = false
+                analysis = nil
+                errorMessage = nil
             }
+        }
+    }
+
+    private func analyze() async {
+        guard let imageData else { return }
+        isAnalyzing = true
+        errorMessage = nil
+        defer { isAnalyzing = false }
+        do {
+            let result = try await appState.aiClient.analyzeFoodImage(imageData: imageData, context: "Пользователь добавляет прием пищи по фото.")
+            analysis = result
+            if result.isFood, let total = result.total {
+                title = result.items.map(\.name).joined(separator: ", ")
+                grams = "\(Int(result.items.reduce(0) { $0 + $1.estimatedGrams }))"
+                calories = "\(Int(total.calories))"
+                protein = "\(Int(total.protein))"
+                fat = "\(Int(total.fat))"
+                carbs = "\(Int(total.carbs))"
+            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }
 
 private struct VoiceFoodSheet: View {
+    @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     let onSave: (MealDraft) -> Void
-    @State private var transcript = "Я съел 3 яйца, 150 грамм риса и 200 грамм курицы"
-    @State private var parsed = false
+    @StateObject private var speech = SpeechRecognitionService()
+    @State private var transcript = ""
+    @State private var analysis: FoodPhotoAnalysis?
+    @State private var isParsing = false
+    @State private var errorMessage: String?
 
     var body: some View {
         FoodFormShell(title: "Голосом") {
@@ -471,26 +656,94 @@ private struct VoiceFoodSheet: View {
                 Circle().stroke(AppColors.purple.opacity(0.75), lineWidth: 3).frame(width: 98, height: 98)
                 Image(systemName: "mic.fill")
                     .font(.system(size: 42, weight: .bold))
-                    .foregroundStyle(AppColors.purple)
+                    .foregroundStyle(speech.isRecording ? AppColors.green : AppColors.purple)
             }
             .frame(maxWidth: .infinity)
 
-            PremiumTextField(placeholder: "Распознанный текст", text: $transcript)
-            Button("Распознать питание") { parsed = true }
-                .buttonStyle(.borderedProminent)
-                .tint(AppColors.purple)
+            Text(speech.isRecording ? "Слушаю..." : "Нажми и говори")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(speech.isRecording ? AppColors.green : AppColors.secondaryText)
+                .frame(maxWidth: .infinity)
 
-            if parsed {
-                PremiumCard(padding: 14, radius: 16) {
-                    Text("Курица с рисом и яйцами • ~865 ккал • Б 83 г • Ж 24 г • У 78 г")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white)
+            PremiumTextField(placeholder: "Распознанный текст", text: $transcript)
+            HStack {
+                Button(speech.isRecording ? "Остановить" : "Записать") {
+                    if speech.isRecording {
+                        speech.stop()
+                    } else {
+                        Task { await speech.start() }
+                    }
                 }
-                PremiumButton(title: "Подтвердить", icon: "checkmark", tint: AppColors.green) {
-                    onSave(MealDraft(title: "Курица с рисом и яйцами", calories: 865, protein: 83, fat: 24, carbs: 78, source: "voice"))
+                Button("Отмена") {
+                    speech.stop()
                     dismiss()
                 }
             }
+            .buttonStyle(.bordered)
+            .tint(AppColors.purple)
+
+            Button(isParsing ? "Распознаю..." : "Распознать питание") {
+                Task { await parse() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppColors.purple)
+            .disabled(transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isParsing)
+
+            if let errorMessage {
+                PremiumCard(padding: 14, radius: 16) {
+                    Text(errorMessage)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(AppColors.yellow)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if let analysis {
+                if analysis.isFood, let total = analysis.total {
+                    PremiumCard(padding: 14, radius: 16) {
+                        Text("\(analysis.items.map(\.name).joined(separator: ", ")) • ~\(Int(total.calories)) ккал • Б \(Int(total.protein)) г • Ж \(Int(total.fat)) г • У \(Int(total.carbs)) г")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    PremiumButton(title: "Подтвердить", icon: "checkmark", tint: AppColors.green) {
+                        onSave(MealDraft(title: analysis.items.map(\.name).joined(separator: ", "), calories: total.calories, protein: total.protein, fat: total.fat, carbs: total.carbs, source: "voice"))
+                        dismiss()
+                    }
+                } else {
+                    PremiumCard(padding: 14, radius: 16) {
+                        Text(analysis.message.isEmpty ? "Не удалось распознать еду в тексте." : analysis.message)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(AppColors.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .onChange(of: speech.transcript) { _, value in
+            transcript = value
+        }
+        .onChange(of: speech.errorMessage) { _, value in
+            errorMessage = value
+        }
+        .onDisappear {
+            speech.stop()
+        }
+    }
+
+    private func parse() async {
+        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            errorMessage = "Не удалось распознать речь."
+            return
+        }
+        isParsing = true
+        errorMessage = nil
+        defer { isParsing = false }
+        do {
+            analysis = try await appState.aiClient.parseFoodText(text, context: "Пользователь добавляет прием пищи голосом.")
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }

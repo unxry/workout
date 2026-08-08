@@ -6,6 +6,7 @@ final class AppState: ObservableObject {
     @Published var selectedTab: CoachTab = .home
     @Published var apiKeyStatus: APIKeyStatus = .unknown
     @Published var healthAuthorization: HealthAuthorizationState = .unknown
+    @Published var pendingCoachPrompt: String?
 
     let aiClient = OpenAIClient()
     let healthKit = HealthKitService()
@@ -18,6 +19,17 @@ final class AppState: ObservableObject {
     func saveOpenAIKey(_ key: String) {
         KeychainStore.shared.saveOpenAIKey(key.trimmingCharacters(in: .whitespacesAndNewlines))
         apiKeyStatus = key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .missing : .configured
+    }
+
+    func openCoach(with prompt: String) {
+        pendingCoachPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        selectedTab = .coach
+    }
+
+    func consumePendingCoachPrompt() -> String? {
+        defer { pendingCoachPrompt = nil }
+        guard let prompt = pendingCoachPrompt, !prompt.isEmpty else { return nil }
+        return prompt
     }
 }
 

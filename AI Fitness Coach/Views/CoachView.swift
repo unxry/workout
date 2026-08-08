@@ -1,5 +1,7 @@
+import PhotosUI
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct CoachView: View {
     @EnvironmentObject private var appState: AppState
@@ -8,17 +10,16 @@ struct CoachView: View {
     @Query(sort: \MealEntry.date, order: .reverse) private var meals: [MealEntry]
     @Query(sort: \CoachMemory.createdAt, order: .reverse) private var memories: [CoachMemory]
 
+    @StateObject private var speech = SpeechRecognitionService()
     @State private var message = ""
     @State private var conversation: [CoachBubble] = [
-        .init(role: .user, text: "Сколько белка мне осталось на сегодня?", time: "01:00"),
-        .init(role: .coach, text: "Давай посмотрим! 👇\n\nТвоя цель по белку: 160 г\nСъедено: 135 г\n\nОсталось: 25 г", time: "01:01"),
-        .init(role: .user, text: "Что можно съесть, чтобы добрать белок?", time: "01:01"),
-        .init(role: .coach, text: "Вот несколько вариантов, чтобы добрать ~25 г белка:\n\n🥚 3 яйца — 18 г белка\n🍗 Куриная грудка (100 г) — 23 г белка\n🍚 Творог 5% (150 г) — 20 г белка\n🥤 Протеиновый коктейль — 24–27 г белка\n\nХочешь, я подберу рецепт или добавлю в дневник?", time: "01:01")
+        .init(role: .coach, text: "Привет. Я готов анализировать питание, тренировки, вес и фото. Напиши вопрос или приложи снимок еды.", time: "сейчас")
     ]
     @State private var isThinking = false
     @State private var showHistory = false
-    @State private var showPlus = false
-    @State private var micMessage = false
+    @State private var pickerItem: PhotosPickerItem?
+    @State private var attachedImage: UIImage?
+    @State private var attachedImageData: Data?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,18 +42,30 @@ struct CoachView: View {
         .sheet(isPresented: $showHistory) {
             SimpleInfoSheet(title: "История чатов", rows: memories.prefix(12).map(\.content) + ["Сегодня: рекомендации по белку и ужину"])
         }
-        .sheet(isPresented: $showPlus) {
-            SimpleInfoSheet(title: "Действия ИИ", rows: [
-                "Составить рацион на завтра",
-                "Разобрать плато веса",
-                "Подобрать тренировку",
-                "Сформировать список покупок"
-            ])
+        .onChange(of: pickerItem) { _, newItem in
+            Task {
+                guard let data = try? await newItem?.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data) else { return }
+                attachedImageData = data
+                attachedImage = image
+            }
         }
-        .alert("Голосовой ввод", isPresented: $micMessage) {
-            Button("OK") { micMessage = false }
-        } message: {
-            Text("Нажми микрофон, продиктуй вопрос и поправь распознанный текст перед отправкой.")
+        .onChange(of: speech.transcript) { _, transcript in
+            if speech.isRecording || !transcript.isEmpty {
+                message = transcript
+            }
+        }
+        .onAppear {
+            if let prompt = appState.consumePendingCoachPrompt() {
+                message = prompt
+                Task { await send() }
+            }
+        }
+        .onChange(of: appState.pendingCoachPrompt) { _, _ in
+            if let prompt = appState.consumePendingCoachPrompt() {
+                message = prompt
+                Task { await send() }
+            }
         }
     }
 
@@ -78,26 +91,58 @@ struct CoachView: View {
 
     private var heroCard: some View {
         PremiumCard(padding: 22, radius: 22) {
-            HStack(alignment: .top, spacing: 20) {
-                AIAvatarLarge()
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Привет! Я твой ИИ-тренер.")
-                        .font(.system(size: 21, weight: .bold))
-                        .foregroundStyle(.white)
-                    Text("Я помогу с питанием, тренировками\nи мотивацией на основе твоих данных.\nСпроси меня о чем угодно!")
-                        .font(.system(size: 16, weight: .regular))
-                        .lineSpacing(4)
-                        .foregroundStyle(AppColors.secondaryText)
-
-                    HStack(spacing: 9) {
-                        chip("Питание", tint: AppColors.green)
-                        chip("Тренировки", tint: AppColors.purple)
-                        chip("Прогресс", tint: AppColors.yellow)
-                        chip("Здоровье", tint: AppColors.blue)
-                    }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 20) {
+                    AIAvatarLarge()
+                    heroText
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Spacer()
+
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .center, spacing: 14) {
+                        AIAvatarLarge(size: 86)
+                        Text("Привет! Я твой ИИ-тренер.")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(.white)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    heroDescription
+                    chipScroll
+                }
             }
+        }
+    }
+
+    private var heroText: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Text("Привет! Я твой ИИ-тренер.")
+                .font(.system(size: 23, weight: .bold))
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+            heroDescription
+            chipScroll
+        }
+    }
+
+    private var heroDescription: some View {
+        Text("Я помогу с питанием, тренировками и мотивацией на основе твоих данных. Спроси меня о чем угодно.")
+            .font(.system(size: 16, weight: .regular))
+            .lineSpacing(4)
+            .foregroundStyle(AppColors.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var chipScroll: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 9) {
+                chip("Питание", tint: AppColors.green)
+                chip("Тренировки", tint: AppColors.purple)
+                chip("Прогресс", tint: AppColors.yellow)
+                chip("Здоровье", tint: AppColors.blue)
+            }
+            .padding(.trailing, 8)
         }
     }
 
@@ -147,20 +192,40 @@ struct CoachView: View {
     }
 
     private var inputBar: some View {
-        HStack(spacing: 10) {
-            Button {
-                Haptics.tap()
-                showPlus = true
-            } label: {
+        VStack(spacing: 8) {
+            if let attachedImage {
+                HStack(spacing: 10) {
+                    Image(uiImage: attachedImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 54, height: 54)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    Text("Фото будет отправлено ИИ вместе с вопросом.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(AppColors.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button {
+                        self.attachedImage = nil
+                        self.attachedImageData = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(AppColors.secondaryText)
+                    }
+                }
+                .padding(.horizontal, 10)
+            }
+
+            HStack(spacing: 10) {
+                PhotosPicker(selection: $pickerItem, matching: .images) {
                 Image(systemName: "plus")
                     .font(.system(size: 25, weight: .regular))
                     .foregroundStyle(.white)
                     .frame(width: 52, height: 52)
                     .background(Circle().fill(Color.white.opacity(0.070)).overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1)))
-            }
-            .buttonStyle(.plain)
+                }
+                .buttonStyle(.plain)
 
-            TextField("Спроси что-нибудь...", text: $message, axis: .vertical)
+                TextField(speech.isRecording ? "Слушаю..." : "Спроси что-нибудь...", text: $message, axis: .vertical)
                 .lineLimit(1...4)
                 .textFieldStyle(.plain)
                 .font(.system(size: 16, weight: .medium))
@@ -168,32 +233,37 @@ struct CoachView: View {
                 .padding(.horizontal, 18)
                 .frame(minHeight: 52)
                 .background(Capsule().fill(Color.white.opacity(0.085)))
+                .layoutPriority(1)
 
-            Button {
-                Haptics.tap()
-                micMessage = true
-                if message.isEmpty { message = "Сколько белка мне осталось?" }
-            } label: {
+                Button {
+                    Haptics.tap()
+                    if speech.isRecording {
+                        speech.stop()
+                    } else {
+                        Task { await speech.start() }
+                    }
+                } label: {
                 Image(systemName: "mic.fill")
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(AppColors.purple)
+                    .foregroundStyle(speech.isRecording ? AppColors.green : AppColors.purple)
                     .frame(width: 54, height: 54)
-                    .background(Circle().stroke(AppColors.purple, lineWidth: 2.5))
-            }
-            .buttonStyle(.plain)
+                    .background(Circle().stroke(speech.isRecording ? AppColors.green : AppColors.purple, lineWidth: 2.5))
+                }
+                .buttonStyle(.plain)
 
-            Button {
-                Task { await send() }
-            } label: {
+                Button {
+                    Task { await send() }
+                } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 54, height: 54)
                     .background(Circle().fill(AppColors.purple.opacity(0.80)))
+                }
+                .buttonStyle(.plain)
+                .disabled((message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachedImageData == nil) || isThinking)
+                .opacity((message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachedImageData == nil) ? 0.55 : 1)
             }
-            .buttonStyle(.plain)
-            .disabled(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isThinking)
-            .opacity(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.55 : 1)
         }
         .padding(8)
         .background(
@@ -211,6 +281,8 @@ struct CoachView: View {
             Text(text)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(tint)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
                 .background(Capsule().fill(tint.opacity(0.10)).overlay(Capsule().stroke(tint.opacity(0.25), lineWidth: 1)))
@@ -239,14 +311,28 @@ struct CoachView: View {
 
     private func send() async {
         let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty || attachedImageData != nil else { return }
 
-        conversation.append(.init(role: .user, text: text, time: "сейчас"))
+        let image = attachedImage
+        let imageData = attachedImageData
+        conversation.append(.init(role: .user, text: text.isEmpty ? "Проанализируй фото" : text, time: "сейчас", image: image))
         message = ""
+        attachedImage = nil
+        attachedImageData = nil
         isThinking = true
 
         let context = buildContext(userMessage: text)
-        let answer = (try? await appState.aiClient.answer(context: context)) ?? fallbackAnswer(for: text)
+        let answer: String
+        do {
+            if let imageData {
+                let analysis = try await appState.aiClient.analyzeFoodImage(imageData: imageData, context: context.profileSummary + " | " + context.todayNutrition + " | вопрос: " + text)
+                answer = formatFoodAnalysis(analysis)
+            } else {
+                answer = try await appState.aiClient.answer(context: context)
+            }
+        } catch {
+            answer = error.localizedDescription
+        }
 
         modelContext.insert(CoachMemory(kind: "chat", content: "Пользователь: \(text). Ответ: \(answer)", importance: 0.6))
         try? modelContext.save()
@@ -256,11 +342,27 @@ struct CoachView: View {
         Haptics.success()
     }
 
-    private func fallbackAnswer(for text: String) -> String {
-        if appState.apiKeyStatus != .configured {
-            return "Добавьте API-ключ в Профиль → ИИ и API. Пока отвечаю локально: сегодня лучше держать белок и воду, без резких ограничений."
+    private func formatFoodAnalysis(_ analysis: FoodPhotoAnalysis) -> String {
+        switch analysis.status {
+        case .notFood:
+            return analysis.message.isEmpty ? "На фотографии не удалось обнаружить еду." : analysis.message
+        case .uncertain:
+            return analysis.message.isEmpty ? "Не уверен, что на фото еда. Попробуйте другое фото." : analysis.message
+        case .food:
+            guard let total = analysis.total else {
+                return "Еда видна, но не удалось надежно оценить БЖУ. Попробуйте фото ближе к блюду."
+            }
+            let items = analysis.items.map { "• \($0.name), ~\(Int($0.estimatedGrams)) г" }.joined(separator: "\n")
+            return """
+            Примерная оценка:
+            ~\(Int(total.calories)) ккал
+            Б \(Int(total.protein)) г • Ж \(Int(total.fat)) г • У \(Int(total.carbs)) г
+
+            \(items)
+
+            Оценка по фото может отличаться из-за неизвестного веса порции, способа приготовления и ингредиентов.
+            """
         }
-        return "Я учел твой дневник и цель. Лучший следующий шаг: добрать белок, оставить углеводы ближе к тренировке и лечь спать без позднего перекуса."
     }
 
     private func buildContext(userMessage: String) -> CoachContext {
@@ -290,6 +392,7 @@ struct CoachBubble: Identifiable {
     let role: Role
     let text: String
     let time: String
+    var image: UIImage? = nil
 }
 
 private struct AIMessageBubble: View {
@@ -304,10 +407,20 @@ private struct AIMessageBubble: View {
             }
 
             VStack(alignment: bubble.role == .user ? .trailing : .leading, spacing: 4) {
+                if let image = bubble.image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 170, height: 126)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.10), lineWidth: 1))
+                }
                 Text(bubble.text)
                     .font(.system(size: 17, weight: .regular))
                     .lineSpacing(4)
                     .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 270, alignment: bubble.role == .user ? .trailing : .leading)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 15)
                     .background(
@@ -333,6 +446,8 @@ private struct AIMessageBubble: View {
 }
 
 private struct AIAvatarLarge: View {
+    var size: CGFloat = 118
+
     var body: some View {
         ZStack {
             Circle().fill(Color.white.opacity(0.08))
@@ -341,7 +456,8 @@ private struct AIAvatarLarge: View {
                 .font(.system(size: 58, weight: .bold))
                 .foregroundStyle(LinearGradient(colors: [.white, AppColors.purple], startPoint: .top, endPoint: .bottom))
         }
-        .frame(width: 118, height: 118)
+        .frame(width: size, height: size)
+        .fixedSize()
     }
 }
 

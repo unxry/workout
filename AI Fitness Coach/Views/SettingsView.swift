@@ -33,9 +33,9 @@ struct SettingsView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .myData:
-                SimpleInfoSheet(title: "Мои данные", rows: ["Рост: \(Int(profile.heightCm)) см", "Вес: \(String(format: "%.1f", profile.currentWeightKg)) кг", "Возраст: \(profile.age)", "Пол: \(profile.sex.rawValue)"])
+                ProfileDataEditSheet(profile: profile, status: $statusMessage)
             case .goal:
-                SimpleInfoSheet(title: "Цель", rows: ["Тип цели: \(profile.goal.rawValue)", "Целевой вес: \(String(format: "%.1f", profile.targetWeightKg)) кг", "Темп: умеренный дефицит"])
+                GoalEditSheet(profile: profile, status: $statusMessage)
             case .nutrition:
                 SimpleInfoSheet(title: "Питание", rows: ["Аллергии: \(profile.allergies.isEmpty ? "не указаны" : profile.allergies)", "Исключенные продукты: \(profile.excludedFoods.isEmpty ? "нет" : profile.excludedFoods)", "Приемов пищи: \(profile.preferredMealsPerDay)"])
             case .training:
@@ -482,7 +482,14 @@ private struct AIAPISettingsSheet: View {
                     status = "Ключ удален"
                 }
                 Button("Проверить") {
-                    status = appState.apiKeyStatus == .configured ? "Подключено" : "Ключ не настроен"
+                    Task {
+                        do {
+                            try await appState.aiClient.testConnection()
+                            status = "Подключено"
+                        } catch {
+                            status = error.localizedDescription
+                        }
+                    }
                 }
             }
             .buttonStyle(.bordered)
@@ -495,6 +502,162 @@ private struct AIAPISettingsSheet: View {
                 dismiss()
             }
         }
+    }
+}
+
+private struct ProfileDataEditSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var profile: UserProfile
+    @Binding var status: String
+    @State private var validation = ""
+
+    var body: some View {
+        FoodFormShell(title: "Мои данные") {
+            PremiumTextField(placeholder: "Имя", text: $profile.name)
+            DatePicker("Дата рождения", selection: $profile.birthDate, displayedComponents: .date)
+                .datePickerStyle(.compact)
+                .foregroundStyle(.white)
+                .tint(AppColors.purple)
+            Picker("Пол", selection: $profile.sexRawValue) {
+                ForEach(BiologicalSex.allCases) { sex in
+                    Text(sex.rawValue).tag(sex.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            PremiumTextField(placeholder: "Рост, см", text: doubleBinding(\.heightCm), keyboard: .decimalPad)
+            PremiumTextField(placeholder: "Текущий вес, кг", text: doubleBinding(\.currentWeightKg), keyboard: .decimalPad)
+
+            if !validation.isEmpty {
+                Text(validation)
+                    .foregroundStyle(AppColors.yellow)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            PremiumButton(title: "Сохранить", icon: "checkmark", tint: AppColors.green) {
+                guard validate() else { return }
+                profile.updatedAt = .now
+                status = "Профиль обновлен"
+                dismiss()
+            }
+        }
+    }
+
+    private func validate() -> Bool {
+        if profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            validation = "Имя не должно быть пустым."
+            return false
+        }
+        if !(120...230).contains(profile.heightCm) {
+            validation = "Укажите реальный рост: 120-230 см."
+            return false
+        }
+        if !(35...250).contains(profile.currentWeightKg) {
+            validation = "Укажите реальный вес: 35-250 кг."
+            return false
+        }
+        if !(10...100).contains(profile.age) {
+            validation = "Проверьте дату рождения."
+            return false
+        }
+        validation = ""
+        return true
+    }
+
+    private func doubleBinding(_ keyPath: ReferenceWritableKeyPath<UserProfile, Double>) -> Binding<String> {
+        Binding(
+            get: { String(format: "%.1f", profile[keyPath: keyPath]) },
+            set: { profile[keyPath: keyPath] = Double($0.replacingOccurrences(of: ",", with: ".")) ?? profile[keyPath: keyPath] }
+        )
+    }
+}
+
+private struct GoalEditSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var profile: UserProfile
+    @Binding var status: String
+    @State private var validation = ""
+    @State private var confirmReset = false
+
+    var body: some View {
+        FoodFormShell(title: "Изменить цель") {
+            Picker("Цель", selection: $profile.goalRawValue) {
+                ForEach(FitnessGoal.allCases) { goal in
+                    Text(goal.rawValue).tag(goal.rawValue)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(AppColors.purple)
+
+            PremiumTextField(placeholder: "Текущий вес, кг", text: doubleBinding(\.currentWeightKg), keyboard: .decimalPad)
+            PremiumTextField(placeholder: "Целевой вес, кг", text: doubleBinding(\.targetWeightKg), keyboard: .decimalPad)
+            PremiumTextField(placeholder: "Активность TDEE множитель", text: doubleBinding(\.activityLevel), keyboard: .decimalPad)
+
+            let targets = NutritionCalculator.targets(for: profile)
+            PremiumCard(padding: 14, radius: 16) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("Новые цели")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("\(Int(targets.calories)) ккал • Б \(Int(targets.protein)) г • Ж \(Int(targets.fat)) г • У \(Int(targets.carbs)) г")
+                        .foregroundStyle(AppColors.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Ориентировочная дата: \(targets.goalDate.formatted(date: .abbreviated, time: .omitted))")
+                        .foregroundStyle(AppColors.purple)
+                }
+            }
+
+            if !validation.isEmpty {
+                Text(validation)
+                    .foregroundStyle(AppColors.yellow)
+            }
+
+            PremiumButton(title: "Сохранить цель", icon: "checkmark", tint: AppColors.green) {
+                guard validate() else { return }
+                profile.updatedAt = .now
+                status = "Цель обновлена"
+                dismiss()
+            }
+
+            Button("Сбросить цель", role: .destructive) {
+                confirmReset = true
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppColors.orange)
+        }
+        .confirmationDialog("Сбросить цель?", isPresented: $confirmReset) {
+            Button("Сбросить", role: .destructive) {
+                profile.goalRawValue = FitnessGoal.maintenance.rawValue
+                profile.targetWeightKg = profile.currentWeightKg
+                profile.updatedAt = .now
+                status = "Цель сброшена"
+                dismiss()
+            }
+            Button("Отмена", role: .cancel) { confirmReset = false }
+        }
+    }
+
+    private func validate() -> Bool {
+        if !(35...250).contains(profile.currentWeightKg) {
+            validation = "Текущий вес должен быть 35-250 кг."
+            return false
+        }
+        if !(35...250).contains(profile.targetWeightKg) {
+            validation = "Целевой вес должен быть 35-250 кг."
+            return false
+        }
+        if !(1.2...2.2).contains(profile.activityLevel) {
+            validation = "Активность должна быть примерно 1.2-2.2."
+            return false
+        }
+        validation = ""
+        return true
+    }
+
+    private func doubleBinding(_ keyPath: ReferenceWritableKeyPath<UserProfile, Double>) -> Binding<String> {
+        Binding(
+            get: { String(format: "%.1f", profile[keyPath: keyPath]) },
+            set: { profile[keyPath: keyPath] = Double($0.replacingOccurrences(of: ",", with: ".")) ?? profile[keyPath: keyPath] }
+        )
     }
 }
 

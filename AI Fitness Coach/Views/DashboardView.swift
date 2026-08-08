@@ -116,38 +116,65 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader(title: "РЕКОМЕНДАЦИИ ИИ")
             PremiumCard(padding: 18, radius: 20) {
-                HStack(spacing: 18) {
-                    AIAvatar(size: 78)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Сегодня ты на \(Int((totals.calories / targets.calories * 100).rounded()))% по калориям.")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.86))
-                        Text(totals.calories > targets.calories ? "Отличный результат!" : "Держим темп спокойно.")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(AppColors.green)
-                        Text("Хочешь подсказку по питанию\nили тренировке?")
-                            .font(.system(size: 15, weight: .regular))
-                            .foregroundStyle(AppColors.secondaryText)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 18) {
+                        AIAvatar(size: 78)
+                        aiRecommendationText
+                            .layoutPriority(1)
+                        aiAskButton
                     }
 
-                    Spacer(minLength: 10)
-
-                    Button {
-                        Haptics.tap()
-                        appState.selectedTab = .coach
-                    } label: {
-                        Text("Спросить ИИ")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 11)
-                            .background(Capsule().stroke(AppColors.purple, lineWidth: 1.8))
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(alignment: .top, spacing: 14) {
+                            AIAvatar(size: 72)
+                            aiRecommendationText
+                                .layoutPriority(1)
+                        }
+                        aiAskButton
+                            .frame(maxWidth: 210, alignment: .leading)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    private var aiRecommendationText: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Сегодня ты на \(Int((totals.calories / targets.calories * 100).rounded()))% по калориям.")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white.opacity(0.86))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(totals.calories > targets.calories ? "Отличный результат." : "Держим темп спокойно.")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(AppColors.green)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Хочешь подсказку по питанию или тренировке?")
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(AppColors.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var aiAskButton: some View {
+        Button {
+            Haptics.tap()
+            appState.openCoach(with: "Дай подсказку по питанию или тренировке на сегодня.")
+        } label: {
+            Text("Спросить ИИ")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(height: 44)
+                .padding(.horizontal, 22)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.045))
+                        .overlay(Capsule().stroke(AppColors.purple, lineWidth: 1.8))
+                        .shadow(color: AppColors.purple.opacity(0.30), radius: 9)
+                )
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .buttonStyle(.plain)
     }
 
     private var dayPlanSection: some View {

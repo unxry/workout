@@ -72,7 +72,9 @@ struct ProgressDashboardView: View {
             ])
         }
         .sheet(isPresented: $showTimer) {
-            RestTimerSheet()
+            RestTimerSheet {
+                showTimer = false
+            }
         }
         .sheet(isPresented: $showHistory) {
             SimpleInfoSheet(title: "История тренировок", rows: historyRows)
@@ -80,25 +82,29 @@ struct ProgressDashboardView: View {
     }
 
     private var tabSelector: some View {
-        HStack(spacing: 22) {
-            ForEach(tabs, id: \.self) { tab in
-                Button {
-                    Haptics.tap()
-                    selectedTab = tab
-                    if tab == "История" { showHistory = true }
-                } label: {
-                    VStack(spacing: 11) {
-                        Text(tab)
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(selectedTab == tab ? AppColors.purple : AppColors.secondaryText)
-                        Rectangle()
-                            .fill(selectedTab == tab ? AppColors.purple : .clear)
-                            .frame(height: 2)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 28) {
+                ForEach(tabs, id: \.self) { tab in
+                    Button {
+                        Haptics.tap()
+                        selectedTab = tab
+                        if tab == "История" { showHistory = true }
+                    } label: {
+                        VStack(spacing: 11) {
+                            Text(tab)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(selectedTab == tab ? AppColors.purple : AppColors.secondaryText)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                            Rectangle()
+                                .fill(selectedTab == tab ? AppColors.purple : .clear)
+                                .frame(height: 2)
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
-            Spacer(minLength: 0)
+            .padding(.trailing, 18)
         }
     }
 
@@ -199,7 +205,8 @@ struct ProgressDashboardView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(AppColors.purple)
                 }
-                HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 10) {
                     IconBadge(systemName: "calendar", tint: AppColors.secondaryText, size: 46)
                     VStack(alignment: .leading, spacing: 5) {
                         Text(workoutLogs.first?.title ?? "Верх тела")
@@ -210,11 +217,14 @@ struct ProgressDashboardView: View {
                             .foregroundStyle(AppColors.secondaryText)
                     }
                     Spacer()
-                    stat("6", "Упражнений")
-                    stat("42:10", "Длит.")
-                    stat("410", "ккал")
                     Image(systemName: "chevron.right")
                         .foregroundStyle(AppColors.mutedText)
+                    }
+                    HStack(spacing: 8) {
+                        stat("6", "Упражнений")
+                        stat("42:10", "Длительность")
+                        stat("410", "ккал")
+                    }
                 }
             }
         }
@@ -272,7 +282,7 @@ struct ProgressDashboardView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(AppColors.secondaryText)
         }
-        .frame(width: 54)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -394,29 +404,42 @@ private struct ActiveWorkoutView: View {
     let exercises: [WorkoutExercise]
     let onFinish: (WorkoutLog) -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var index = 0
-    @State private var set = 1
+    @State private var engine: WorkoutFlowEngine
+    @State private var phaseBeforePause: WorkoutPhase = .runningExercise
     @State private var weight = "70"
     @State private var reps = "10"
     @State private var showRest = false
+    @State private var confirmStop = false
+
+    init(exercises: [WorkoutExercise], onFinish: @escaping (WorkoutLog) -> Void) {
+        self.exercises = exercises
+        self.onFinish = onFinish
+        _engine = State(initialValue: WorkoutFlowEngine(exerciseCount: exercises.count))
+    }
 
     var body: some View {
         ZStack {
             PremiumBackground()
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
-                    Text("\(index + 1) / \(exercises.count) exercises")
+                    Text("\(engine.exerciseIndex + 1) / \(exercises.count) exercises")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(AppColors.purple)
                     Spacer()
-                    Button("Закрыть") { dismiss() }
+                    Button("Закрыть") { confirmStop = true }
                         .foregroundStyle(AppColors.secondaryText)
                 }
-                GradientProgressBar(progress: Double(index + 1) / Double(exercises.count), tint: AppColors.purple, height: 7)
-                Text(exercises[index].title)
+                GradientProgressBar(progress: Double(engine.exerciseIndex + 1) / Double(exercises.count), tint: AppColors.purple, height: 7)
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    Text(formatDuration(engine.elapsed))
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                }
+                Text(exercises[engine.exerciseIndex].title)
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(.white)
-                Text("Set \(set) / 4")
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Set \(engine.setIndex) / \(engine.setsPerExercise)")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(AppColors.secondaryText)
                 PremiumTextField(placeholder: "Weight kg", text: $weight, keyboard: .decimalPad)
@@ -426,32 +449,62 @@ private struct ActiveWorkoutView: View {
                         .foregroundStyle(AppColors.secondaryText)
                 }
                 PremiumButton(title: "Завершить подход", icon: "checkmark", tint: AppColors.green) {
-                    if set < 4 {
-                        set += 1
-                        showRest = true
-                    } else if index < exercises.count - 1 {
-                        index += 1
-                        set = 1
-                        showRest = true
-                    } else {
-                        onFinish(WorkoutLog(title: "Верх тела", durationMinutes: 52, calories: 410, notes: "21 подход • 8 420 кг volume"))
-                        dismiss()
-                    }
+                    finishSet()
                 }
+                HStack(spacing: 10) {
+                    Button(engine.phase == .paused ? "Resume" : "Pause") {
+                        if engine.phase == .paused {
+                            engine.resume(previousPhase: phaseBeforePause)
+                        } else {
+                            phaseBeforePause = engine.phase
+                            engine.pause()
+                        }
+                    }
+                    Button("Finish") { completeWorkout() }
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.purple)
                 Spacer()
             }
             .padding(22)
         }
         .sheet(isPresented: $showRest) {
-            RestTimerSheet()
+            RestTimerSheet {
+                engine.skipRest()
+                showRest = false
+            }
         }
+        .confirmationDialog("Завершить тренировку?", isPresented: $confirmStop) {
+            Button("Завершить", role: .destructive) { dismiss() }
+            Button("Отмена", role: .cancel) { confirmStop = false }
+        }
+    }
+
+    private func finishSet() {
+        engine.finishSet()
+        if engine.phase == .resting {
+            showRest = true
+        } else if engine.phase == .completed {
+            completeWorkout()
+        }
+    }
+
+    private func completeWorkout() {
+        let minutes = max(1, Int(engine.elapsed / 60))
+        onFinish(WorkoutLog(title: "Верх тела", durationMinutes: minutes, calories: 410, notes: "\(exercises.count) упражнений • \(engine.setsPerExercise) подхода"))
+        dismiss()
+    }
+
+    private func formatDuration(_ seconds: TimeInterval) -> String {
+        let value = max(0, Int(seconds))
+        return String(format: "%02d:%02d", value / 60, value % 60)
     }
 }
 
 private struct RestTimerSheet: View {
+    let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var seconds = 90
-    @State private var paused = false
+    @State private var countdown = RestCountdown(duration: 90)
 
     var body: some View {
         ZStack {
@@ -460,15 +513,30 @@ private struct RestTimerSheet: View {
                 Text("Rest")
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(.white)
-                CircularProgress(progress: Double(seconds) / 90.0, tint: AppColors.purple, lineWidth: 12, size: 180) {
-                    Text(String(format: "%02d:%02d", seconds / 60, seconds % 60))
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundStyle(.white)
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let remaining = countdown.remaining(now: context.date)
+                    CircularProgress(progress: remaining / countdown.duration, tint: AppColors.purple, lineWidth: 12, size: 180) {
+                        Text(String(format: "%02d:%02d", Int(remaining) / 60, Int(remaining) % 60))
+                            .font(.system(size: 36, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                    }
+                    .onChange(of: Int(remaining)) { _, value in
+                        if value <= 0 {
+                            Haptics.success()
+                            onComplete()
+                            dismiss()
+                        }
+                    }
                 }
                 HStack {
-                    Button("+30 sec") { seconds += 30 }
-                    Button(paused ? "Resume" : "Pause") { paused.toggle() }
-                    Button("Skip") { dismiss() }
+                    Button("+30 sec") { countdown.add(30) }
+                    Button(countdown.isPaused ? "Resume" : "Pause") {
+                        countdown.isPaused ? countdown.resume() : countdown.pause()
+                    }
+                    Button("Skip") {
+                        onComplete()
+                        dismiss()
+                    }
                 }
                 .buttonStyle(.bordered)
                 .tint(AppColors.purple)

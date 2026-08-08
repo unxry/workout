@@ -13,12 +13,15 @@
 		14A653B0E397ECA74B23EEA0 /* NutritionCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AED252C4F1BC0789FD1A6C /* NutritionCalculator.swift */; };
 		155F866D9F2BD4BE4AA3086C /* OpenAIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78582ED9A81B35731F0218DC /* OpenAIClient.swift */; };
 		31A048E98C1D6A05E6C56470 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 70B22FD649D470E7B12E51BF /* Assets.xcassets */; };
+		48EACC0C44A5EB5315070061 /* SpeechRecognitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F22E28FD63CD8B52D8B26D62 /* SpeechRecognitionService.swift */; };
 		4A15325CA8B4392DF63A169A /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7EC5BD3EEE4F5E6ECA7BCBE /* NotificationService.swift */; };
 		601BCCA0F7C8F3092C79E8FF /* FitnessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787D581BD9CB73230A6CADC1 /* FitnessModels.swift */; };
 		6F830D221E2F08F4CF09FC64 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 981163C5A3CEA4B6525FBF6B /* AppState.swift */; };
 		7151420104926619B1B9293A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F8A1C25C38D37F077A2A71 /* SettingsView.swift */; };
 		7D389EB64893399C7B8BAEFD /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B774896C0ABF8E684A7AA74 /* DashboardView.swift */; };
+		A2A43E556E2B13E7597B0BB0 /* WorkoutRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1100BBE96B978D66F0833B04 /* WorkoutRuntime.swift */; };
 		A77027EAB9D785FE84A227E2 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 325D1EA712E28C1006E09979 /* KeychainStore.swift */; };
+		AC1E4C5062D971DF58C8E864 /* AI_Fitness_CoachTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74ADE2B67DED2E06A8A5C9A9 /* AI_Fitness_CoachTests.swift */; };
 		BF6F7C7C080DAA9E90A6C357 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EA59119894548F34251A784 /* OnboardingView.swift */; };
 		C11239A17571CBF196A432A1 /* PremiumComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F01305EE26D8C8823BF05D9 /* PremiumComponents.swift */; };
 		D4C2DF0412B2B3EE0E01C8B6 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3696D1719E64A77AFF2810D /* RootView.swift */; };
@@ -26,14 +29,27 @@
 		FE451F27054A5019B6206800 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 955A9C1E39AC7F73CD180122 /* HealthKitService.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		5E1BD7F438D60B699ED51325 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 060E50C2E7DF79C35AFE736A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CA4AD6495338136475B5B3C2;
+			remoteInfo = "AI Fitness Coach";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		1100BBE96B978D66F0833B04 /* WorkoutRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutRuntime.swift; sourceTree = "<group>"; };
 		1EA59119894548F34251A784 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		2BB93678F3296B0DBA90FDA8 /* AI_Fitness_CoachApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI_Fitness_CoachApp.swift; sourceTree = "<group>"; };
 		325D1EA712E28C1006E09979 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		33E97419EA7EE81134BB22CA /* ProgressDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressDashboardView.swift; sourceTree = "<group>"; };
 		49F8A1C25C38D37F077A2A71 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		4F01305EE26D8C8823BF05D9 /* PremiumComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumComponents.swift; sourceTree = "<group>"; };
+		62325E98F6EB9AC916B0C4EF /* AI Fitness CoachTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = "AI Fitness CoachTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		70B22FD649D470E7B12E51BF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		74ADE2B67DED2E06A8A5C9A9 /* AI_Fitness_CoachTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI_Fitness_CoachTests.swift; sourceTree = "<group>"; };
 		78582ED9A81B35731F0218DC /* OpenAIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIClient.swift; sourceTree = "<group>"; };
 		787D581BD9CB73230A6CADC1 /* FitnessModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessModels.swift; sourceTree = "<group>"; };
 		7C6E5D7950B6B4AA594379C0 /* NutritionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionView.swift; sourceTree = "<group>"; };
@@ -46,6 +62,7 @@
 		D7EC5BD3EEE4F5E6ECA7BCBE /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		E3696D1719E64A77AFF2810D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		E5CBF6899D24610851D6C155 /* AI Fitness Coach.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "AI Fitness Coach.entitlements"; sourceTree = "<group>"; };
+		F22E28FD63CD8B52D8B26D62 /* SpeechRecognitionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognitionService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -62,6 +79,7 @@
 			isa = PBXGroup;
 			children = (
 				787D581BD9CB73230A6CADC1 /* FitnessModels.swift */,
+				1100BBE96B978D66F0833B04 /* WorkoutRuntime.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -78,6 +96,7 @@
 			isa = PBXGroup;
 			children = (
 				B647C06544DB98A77D874F83 /* AI Fitness Coach */,
+				942915EB6A9A5746AEE69DF5 /* AI Fitness CoachTests */,
 				D084210C1564B81EB9183E81 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +109,7 @@
 				D7EC5BD3EEE4F5E6ECA7BCBE /* NotificationService.swift */,
 				D4AED252C4F1BC0789FD1A6C /* NutritionCalculator.swift */,
 				78582ED9A81B35731F0218DC /* OpenAIClient.swift */,
+				F22E28FD63CD8B52D8B26D62 /* SpeechRecognitionService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -107,6 +127,14 @@
 				4F739A3B87924E58A80E1FB3 /* Components */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		942915EB6A9A5746AEE69DF5 /* AI Fitness CoachTests */ = {
+			isa = PBXGroup;
+			children = (
+				74ADE2B67DED2E06A8A5C9A9 /* AI_Fitness_CoachTests.swift */,
+			);
+			path = "AI Fitness CoachTests";
 			sourceTree = "<group>";
 		};
 		B647C06544DB98A77D874F83 /* AI Fitness Coach */ = {
@@ -134,6 +162,7 @@
 			isa = PBXGroup;
 			children = (
 				CECBA1D022F3C340C9703BE8 /* AI Fitness Coach.app */,
+				62325E98F6EB9AC916B0C4EF /* AI Fitness CoachTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -158,6 +187,24 @@
 			productName = "AI Fitness Coach";
 			productReference = CECBA1D022F3C340C9703BE8 /* AI Fitness Coach.app */;
 			productType = "com.apple.product-type.application";
+		};
+		DF8B3A96B4A3ABBAB494668E /* AI Fitness CoachTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7B58FCDC3E45C651AF79D4D5 /* Build configuration list for PBXNativeTarget "AI Fitness CoachTests" */;
+			buildPhases = (
+				B168A19521736DE382A46DB9 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0A79E08D83881C3546331F67 /* PBXTargetDependency */,
+			);
+			name = "AI Fitness CoachTests";
+			packageProductDependencies = (
+			);
+			productName = "AI Fitness CoachTests";
+			productReference = 62325E98F6EB9AC916B0C4EF /* AI Fitness CoachTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -188,6 +235,7 @@
 			projectRoot = "";
 			targets = (
 				CA4AD6495338136475B5B3C2 /* AI Fitness Coach */,
+				DF8B3A96B4A3ABBAB494668E /* AI Fitness CoachTests */,
 			);
 		};
 /* End PBXProject section */
@@ -204,6 +252,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		B168A19521736DE382A46DB9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AC1E4C5062D971DF58C8E864 /* AI_Fitness_CoachTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D2FD4084109CF9070D0B8826 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -224,10 +280,20 @@
 				0B75A016DCB0A22F9BA260D7 /* ProgressDashboardView.swift in Sources */,
 				D4C2DF0412B2B3EE0E01C8B6 /* RootView.swift in Sources */,
 				7151420104926619B1B9293A /* SettingsView.swift in Sources */,
+				48EACC0C44A5EB5315070061 /* SpeechRecognitionService.swift in Sources */,
+				A2A43E556E2B13E7597B0BB0 /* WorkoutRuntime.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0A79E08D83881C3546331F67 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CA4AD6495338136475B5B3C2 /* AI Fitness Coach */;
+			targetProxy = 5E1BD7F438D60B699ED51325 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		016F01671C3FCD8D0CC8AA82 /* Debug */ = {
@@ -241,8 +307,12 @@
 				INFOPLIST_FILE = "AI Fitness Coach/Resources/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "AI Fitness Coach";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				INFOPLIST_KEY_NSCameraUsageDescription = "AI Fitness Coach uses the camera to analyze meal photos when you choose to add food by photo.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "AI Fitness Coach uses steps, activity, weight, and sleep to adapt your plan.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "AI Fitness Coach does not write to Apple Health without explicit permission.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "AI Fitness Coach uses the microphone for voice food logging and voice messages to the AI coach.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "AI Fitness Coach reads selected photos to analyze food and answer questions about images you attach.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "AI Fitness Coach uses speech recognition to transcribe your voice before sending or parsing it.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -269,8 +339,12 @@
 				INFOPLIST_FILE = "AI Fitness Coach/Resources/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "AI Fitness Coach";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				INFOPLIST_KEY_NSCameraUsageDescription = "AI Fitness Coach uses the camera to analyze meal photos when you choose to add food by photo.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "AI Fitness Coach uses steps, activity, weight, and sleep to adapt your plan.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "AI Fitness Coach does not write to Apple Health without explicit permission.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "AI Fitness Coach uses the microphone for voice food logging and voice messages to the AI coach.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "AI Fitness Coach reads selected photos to analyze food and answer questions about images you attach.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "AI Fitness Coach uses speech recognition to transcribe your voice before sending or parsing it.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -285,6 +359,46 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
+		};
+		893DE08A8BF67173BB79E618 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AI Fitness Coach.app/AI Fitness Coach";
+			};
+			name = Release;
+		};
+		CC991D81E116EF987357BD96 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AI Fitness Coach.app/AI Fitness Coach";
+			};
+			name = Debug;
 		};
 		D39E97907D611AF1715E0CE8 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -413,6 +527,15 @@
 			buildConfigurations = (
 				F371B7A7D377AD2DA9569413 /* Debug */,
 				D39E97907D611AF1715E0CE8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7B58FCDC3E45C651AF79D4D5 /* Build configuration list for PBXNativeTarget "AI Fitness CoachTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC991D81E116EF987357BD96 /* Debug */,
+				893DE08A8BF67173BB79E618 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
