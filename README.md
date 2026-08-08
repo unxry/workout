@@ -85,6 +85,12 @@ https://your-api-service.up.railway.app/api/telegram/debug
 
 Then register the webhook with `/api/telegram/set-webhook` as described in [RAILWAY_DEPLOY.md](RAILWAY_DEPLOY.md).
 
+## Timeweb Cloud Deployment
+
+For Timeweb Cloud App Platform, use the root `Dockerfile`. It builds the Mini App and serves it from the same FastAPI service, so you only need one app URL.
+
+See [TIMEWEB_DEPLOY.md](TIMEWEB_DEPLOY.md).
+
 ## Production With Docker Compose
 
 ```bash
