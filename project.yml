@@ -12,11 +12,11 @@ targets:
       - path: AI Fitness Coach
         excludes:
           - Resources/Info.plist
-          - Resources/AI Fitness Coach.entitlements
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.unxry.aifitnesscoach
         GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: AI Fitness Coach/Resources/AI Fitness Coach.entitlements
         INFOPLIST_KEY_CFBundleDisplayName: AI Fitness Coach
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.healthcare-fitness
         INFOPLIST_KEY_NSHealthShareUsageDescription: AI Fitness Coach uses steps, activity, weight, and sleep to adapt your plan.
