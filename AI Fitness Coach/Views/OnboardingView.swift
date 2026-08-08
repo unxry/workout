@@ -63,7 +63,7 @@ struct OnboardingView: View {
                         TextField("Исключенные продукты", text: $excludedFoods)
                             .textFieldStyle(.roundedBorder)
                     }
-                    .tint(.purpleAccent)
+                    .tint(Color.purpleAccent)
                     .foregroundStyle(.white)
                 }
 
@@ -76,7 +76,7 @@ struct OnboardingView: View {
                         .padding(.vertical, 17)
                         .background(
                             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(LinearGradient(colors: [.purpleAccent, .blueAccent], startPoint: .leading, endPoint: .trailing))
+                                .fill(LinearGradient(colors: [Color.purpleAccent, Color.blueAccent], startPoint: .leading, endPoint: .trailing))
                         )
                         .foregroundStyle(.white)
                 }

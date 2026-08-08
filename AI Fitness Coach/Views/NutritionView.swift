@@ -36,7 +36,7 @@ struct NutritionView: View {
                             addMeal()
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.greenAccent)
+                        .tint(Color.greenAccent)
                     }
                     .textFieldStyle(.roundedBorder)
                 }
@@ -55,7 +55,7 @@ struct NutritionView: View {
                             Spacer()
                             Text("\(Int(meal.calories))")
                                 .font(.title3.weight(.bold))
-                                .foregroundStyle(.greenAccent)
+                                .foregroundStyle(Color.greenAccent)
                         }
                     }
                 }

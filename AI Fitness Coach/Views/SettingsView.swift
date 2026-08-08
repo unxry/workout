@@ -25,7 +25,7 @@ struct SettingsView: View {
                             apiKey = ""
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.purpleAccent)
+                        .tint(Color.purpleAccent)
 
                         Text(appState.apiKeyStatus == .configured ? "Ключ сохранен локально на iPhone." : "Без ключа AI работает в fallback-режиме.")
                             .font(.footnote)
@@ -52,7 +52,7 @@ struct SettingsView: View {
                             }
                         }
                         .buttonStyle(.bordered)
-                        .tint(.greenAccent)
+                        .tint(Color.greenAccent)
                         if !healthStatus.isEmpty {
                             Text(healthStatus)
                                 .font(.footnote)
@@ -85,7 +85,7 @@ struct SettingsView: View {
                             }
                         }
                         .buttonStyle(.bordered)
-                        .tint(.yellowAccent)
+                        .tint(Color.yellowAccent)
                         if !notificationStatus.isEmpty {
                             Text(notificationStatus)
                                 .font(.footnote)

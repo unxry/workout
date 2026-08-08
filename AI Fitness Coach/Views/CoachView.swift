@@ -49,7 +49,7 @@ struct CoachView: View {
                     if isThinking {
                         HStack {
                             ProgressView()
-                                .tint(.purpleAccent)
+                                .tint(Color.purpleAccent)
                             Text("Анализирую память и дневник...")
                                 .font(.subheadline)
                                 .foregroundStyle(.white.opacity(0.62))
@@ -76,7 +76,7 @@ struct CoachView: View {
                     Image(systemName: "arrow.up")
                         .font(.headline.weight(.bold))
                         .frame(width: 44, height: 44)
-                        .background(Circle().fill(.purpleAccent))
+                        .background(Circle().fill(Color.purpleAccent))
                         .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)

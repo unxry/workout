@@ -79,7 +79,7 @@ struct DashboardView: View {
                     )
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.yellowAccent.opacity(0.32), .greenAccent.opacity(0.04)],
+                            colors: [Color.yellowAccent.opacity(0.32), Color.greenAccent.opacity(0.04)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -91,7 +91,7 @@ struct DashboardView: View {
                         y: .value("Вес", point.weight)
                     )
                     .foregroundStyle(
-                        LinearGradient(colors: [.orange, .yellowAccent, .greenAccent], startPoint: .leading, endPoint: .trailing)
+                        LinearGradient(colors: [Color.orange, Color.yellowAccent, Color.greenAccent], startPoint: .leading, endPoint: .trailing)
                     )
                     .lineStyle(.init(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     .interpolationMethod(.catmullRom)
@@ -107,7 +107,7 @@ struct DashboardView: View {
                 .chartYAxis(.hidden)
                 .frame(height: 140)
 
-                Text("Цель: \(profile.currentWeightKg, specifier: "%.1f") -> \(profile.targetWeightKg, specifier: "%.1f") кг")
+                Text("Цель: \(String(format: "%.1f", profile.currentWeightKg)) -> \(String(format: "%.1f", profile.targetWeightKg)) кг")
                     .font(.callout.weight(.medium))
                     .foregroundStyle(.white.opacity(0.68))
             }
@@ -124,7 +124,7 @@ struct DashboardView: View {
                 HStack(spacing: 14) {
                     Image(systemName: "face.smiling.inverse")
                         .font(.system(size: 42))
-                        .foregroundStyle(.purpleAccent)
+                        .foregroundStyle(Color.purpleAccent)
                         .frame(width: 58, height: 58)
                         .background(Circle().fill(.purple.opacity(0.16)))
 
@@ -153,7 +153,7 @@ struct DashboardView: View {
                 PlanRow(icon: "fork.knife", title: "Питание", value: "\(Int(calories)) / \(Int(targets.calories)) ккал", progress: NutritionCalculator.progress(current: calories, target: targets.calories), tint: .greenAccent)
                 PlanRow(icon: "figure.strengthtraining.traditional", title: "Тренировка", value: "\(profile.trainingDaysPerWeek) / нед", progress: 0.65, tint: .purpleAccent)
                 PlanRow(icon: "figure.walk", title: "Активность", value: "Цель 10 000 шагов", progress: 0.72, tint: .yellowAccent)
-                PlanRow(icon: "drop.fill", title: "Вода", value: "\(targets.waterLiters, specifier: "%.1f") л", progress: 0.58, tint: .blueAccent)
+                PlanRow(icon: "drop.fill", title: "Вода", value: "\(String(format: "%.1f", targets.waterLiters)) л", progress: 0.58, tint: .blueAccent)
             }
         }
     }

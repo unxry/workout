@@ -25,11 +25,11 @@ struct ProgressDashboardView: View {
                         Chart(series) { point in
                             LineMark(x: .value("Дата", point.date), y: .value("Вес", point.weight))
                                 .interpolationMethod(.catmullRom)
-                                .foregroundStyle(.greenAccent)
+                                .foregroundStyle(Color.greenAccent)
                                 .lineStyle(.init(lineWidth: 2, lineCap: .round, lineJoin: .round))
                             AreaMark(x: .value("Дата", point.date), y: .value("Вес", point.weight))
                                 .interpolationMethod(.catmullRom)
-                                .foregroundStyle(.greenAccent.opacity(0.14))
+                                .foregroundStyle(Color.greenAccent.opacity(0.14))
                         }
                         .chartXAxis(.hidden)
                         .chartYAxis(.hidden)
@@ -47,7 +47,7 @@ struct ProgressDashboardView: View {
                             addWeight()
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.greenAccent)
+                        .tint(Color.greenAccent)
                     }
                 }
 
@@ -57,7 +57,7 @@ struct ProgressDashboardView: View {
                             Text(metric.date, format: .dateTime.day().month().year())
                                 .foregroundStyle(.white.opacity(0.7))
                             Spacer()
-                            Text("\(metric.weightKg, specifier: "%.1f") кг")
+                            Text("\(String(format: "%.1f", metric.weightKg)) кг")
                                 .font(.headline)
                                 .foregroundStyle(.white)
                         }

@@ -19,7 +19,7 @@ final class HealthKitService {
             .bodyMass,
             .height,
             .heartRate,
-            .restingEnergyBurned
+            .basalEnergyBurned
         ]
 
         for identifier in identifiers {
