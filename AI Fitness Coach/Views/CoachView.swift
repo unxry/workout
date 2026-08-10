@@ -1,16 +1,10 @@
 import PhotosUI
-import SwiftData
 import SwiftUI
 import UIKit
 
 struct CoachView: View {
     @EnvironmentObject private var appState: AppState
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \UserProfile.createdAt) private var profiles: [UserProfile]
-    @Query(sort: \MealEntry.date, order: .reverse) private var meals: [MealEntry]
-    @Query(sort: \CoachMemory.createdAt, order: .reverse) private var memories: [CoachMemory]
-    @Query(sort: \DailyMetric.date) private var metrics: [DailyMetric]
-    @Query(sort: \WorkoutLog.date, order: .reverse) private var workouts: [WorkoutLog]
+    @EnvironmentObject private var store: LocalDataStore
 
     @StateObject private var speech = SpeechRecognitionService()
     @State private var message = ""
@@ -45,21 +39,21 @@ struct CoachView: View {
                 .padding(.bottom, 8)
         }
         .sheet(isPresented: $showHistory) {
-            SimpleInfoSheet(title: "История чатов", rows: memories.prefix(12).map(\.content) + ["Сегодня: рекомендации по белку и ужину"])
+            SimpleInfoSheet(title: "История чатов", rows: store.memories.prefix(12).map(\.content) + ["Сегодня: рекомендации по белку и ужину"])
         }
-        .onChange(of: pickerItem) { _, newItem in
+        .onChange(of: pickerItem) { newItem in
             Task {
                 guard let data = try? await newItem?.loadTransferable(type: Data.self),
                       let image = UIImage(data: data) else { return }
                 setAttachedImage(image)
             }
         }
-        .onChange(of: speech.transcript) { _, transcript in
+        .onChange(of: speech.transcript) { transcript in
             if speech.isRecording || !transcript.isEmpty {
                 message = transcript
             }
         }
-        .onChange(of: speech.errorMessage) { _, value in
+        .onChange(of: speech.errorMessage) { value in
             inputError = value
         }
         .confirmationDialog("Добавить изображение", isPresented: $showImageSourceDialog, titleVisibility: .visible) {
@@ -86,7 +80,7 @@ struct CoachView: View {
                 Task { await send() }
             }
         }
-        .onChange(of: appState.pendingAlicePrompt) { _, _ in
+        .onChange(of: appState.pendingAlicePrompt) { _ in
             if let prompt = appState.consumePendingAlicePrompt() {
                 message = prompt
                 Task { await send() }
@@ -389,8 +383,7 @@ struct CoachView: View {
             answer = AIClientError.from(error).localizedDescription
         }
 
-        modelContext.insert(CoachMemory(kind: "chat", content: "Пользователь: \(text). Ответ: \(answer)", importance: 0.6))
-        try? modelContext.save()
+        store.addMemory(CoachMemory(kind: "chat", content: "Пользователь: \(text). Ответ: \(answer)", importance: 0.6))
 
         conversation.append(.init(role: .coach, text: answer, time: "сейчас"))
         isThinking = false
@@ -432,18 +425,18 @@ struct CoachView: View {
     }
 
     private func buildContext(userMessage: String) -> CoachContext {
-        let profile = profiles.first
+        let profile = store.profile
         let targets = profile.map { NutritionCalculator.targets(for: $0) }
         let calendar = Calendar.current
-        let todayMeals = meals.filter { calendar.isDateInToday($0.date) }
+        let todayMeals = store.meals.filter { calendar.isDateInToday($0.date) }
         let calories = todayMeals.reduce(0) { $0 + $1.calories }
         let protein = todayMeals.reduce(0) { $0 + $1.protein }
         let fat = todayMeals.reduce(0) { $0 + $1.fat }
         let carbs = todayMeals.reduce(0) { $0 + $1.carbs }
-        let latestMetric = metrics.last
+        let latestMetric = store.metrics.last
         let mealSummary = todayMeals.prefix(5).map { "\($0.title): \(Int($0.calories)) ккал" }.joined(separator: "; ")
         let trendSummary: String
-        if let first = metrics.suffix(7).first, let last = metrics.suffix(7).last {
+        if let first = store.metrics.suffix(7).first, let last = store.metrics.suffix(7).last {
             trendSummary = "вес \(String(format: "%.1f", first.weightKg)) -> \(String(format: "%.1f", last.weightKg)) кг за последние записи"
         } else {
             trendSummary = "недостаточно записей веса для тренда"
@@ -453,7 +446,7 @@ struct CoachView: View {
             profileSummary: profile.map { "\($0.name), цель \($0.goal.rawValue), вес \($0.currentWeightKg), целевой вес \($0.targetWeightKg), рост \($0.heightCm), возраст \($0.age)" } ?? "Профиль еще не заполнен",
             todayNutrition: targets.map { "цель \(Int($0.calories)) ккал; съедено \(Int(calories)) ккал; Б \(Int(protein))/\(Int($0.protein)) г; Ж \(Int(fat))/\(Int($0.fat)) г; У \(Int(carbs))/\(Int($0.carbs)) г; вода цель \(String(format: "%.1f", $0.waterLiters)) л; последние приемы: \(mealSummary.isEmpty ? "нет записей" : mealSummary)" } ?? "Нет цели",
             recentTrend: "\(trendSummary); шаги \(Int(latestMetric?.steps ?? 0)); активная энергия \(Int(latestMetric?.activeEnergyKcal ?? 0)) ккал; вода \(String(format: "%.1f", latestMetric?.waterLiters ?? 0)) л; сон \(String(format: "%.1f", latestMetric?.sleepHours ?? 0)) ч",
-            memories: memories.prefix(8).map(\.content),
+            memories: store.memories.prefix(8).map(\.content),
             userMessage: userMessage
         )
     }

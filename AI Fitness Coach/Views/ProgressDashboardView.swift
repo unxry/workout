@@ -1,10 +1,8 @@
-import SwiftData
 import SwiftUI
 
 struct ProgressDashboardView: View {
     @EnvironmentObject private var appState: AppState
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \WorkoutLog.date, order: .reverse) private var workoutLogs: [WorkoutLog]
+    @EnvironmentObject private var store: LocalDataStore
 
     @State private var selectedTab = "Сегодня"
     @State private var selectedExercise: WorkoutExercise?
@@ -41,8 +39,7 @@ struct ProgressDashboardView: View {
         }
         .fullScreenCover(isPresented: $showActiveWorkout) {
             ActiveWorkoutView(exercises: workoutPlanData) { log in
-                modelContext.insert(log)
-                try? modelContext.save()
+                store.addWorkout(log)
                 Haptics.success()
             }
         }
@@ -58,8 +55,7 @@ struct ProgressDashboardView: View {
         }
         .sheet(isPresented: $showCreate) {
             CreateWorkoutSheet { title in
-                modelContext.insert(WorkoutLog(title: title, durationMinutes: 45, calories: 360, notes: "Создано вручную"))
-                try? modelContext.save()
+                store.addWorkout(WorkoutLog(title: title, durationMinutes: 45, calories: 360, notes: "Создано вручную"))
             }
         }
         .sheet(isPresented: $showMuscleFocus) {
@@ -209,7 +205,7 @@ struct ProgressDashboardView: View {
                     HStack(spacing: 10) {
                     IconBadge(systemName: "calendar", tint: AppColors.secondaryText, size: 46)
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(workoutLogs.first?.title ?? "Верх тела")
+                        Text(store.workouts.first?.title ?? "Верх тела")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
                         Text("5 августа 2026 • 18:40")
@@ -231,10 +227,10 @@ struct ProgressDashboardView: View {
     }
 
     private var historyRows: [String] {
-        if workoutLogs.isEmpty {
+        if store.workouts.isEmpty {
             return ["Верх тела • 42:10 • 6 упражнений • 410 ккал"]
         }
-        return workoutLogs.map { "\($0.title) • \($0.durationMinutes) мин • \(Int($0.calories)) ккал" }
+        return store.workouts.map { "\($0.title) • \($0.durationMinutes) мин • \(Int($0.calories)) ккал" }
     }
 
     private func workoutPill(icon: String, text: String) -> some View {
@@ -531,7 +527,7 @@ private struct RestTimerSheet: View {
                             .font(.system(size: 36, weight: .bold, design: .monospaced))
                             .foregroundStyle(.white)
                     }
-                    .onChange(of: Int(remaining)) { _, value in
+                    .onChange(of: Int(remaining)) { value in
                         if value <= 0 {
                             Haptics.success()
                             onComplete()

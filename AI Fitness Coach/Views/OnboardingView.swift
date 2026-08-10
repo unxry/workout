@@ -1,8 +1,7 @@
-import SwiftData
 import SwiftUI
 
 struct OnboardingView: View {
-    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var store: LocalDataStore
 
     @State private var name = ""
     @State private var birthDate = Calendar.current.date(byAdding: .year, value: -30, to: .now) ?? .now
@@ -117,8 +116,6 @@ struct OnboardingView: View {
             allergies: allergies,
             excludedFoods: excludedFoods
         )
-        modelContext.insert(profile)
-        modelContext.insert(DailyMetric(date: .now, weightKg: weight))
-        try? modelContext.save()
+        store.createProfile(profile, initialWeight: weight)
     }
 }

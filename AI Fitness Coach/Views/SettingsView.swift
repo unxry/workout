@@ -1,15 +1,10 @@
 import LocalAuthentication
-import SwiftData
 import SwiftUI
 import UserNotifications
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \UserProfile.createdAt) private var profiles: [UserProfile]
-    @Query(sort: \MealEntry.date, order: .reverse) private var meals: [MealEntry]
-    @Query(sort: \DailyMetric.date, order: .reverse) private var metrics: [DailyMetric]
-    @Query(sort: \WorkoutLog.date, order: .reverse) private var workouts: [WorkoutLog]
+    @EnvironmentObject private var store: LocalDataStore
 
     @State private var activeSheet: ProfileSheet?
     @State private var statusMessage = ""
@@ -33,9 +28,24 @@ struct SettingsView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .myData:
-                ProfileDataEditSheet(profile: profile, status: $statusMessage)
+                ProfileDataEditSheet(profile: profile, status: $statusMessage) { updated in
+                    store.updateProfile { profile in
+                        profile.name = updated.name
+                        profile.birthDate = updated.birthDate
+                        profile.sexRawValue = updated.sexRawValue
+                        profile.heightCm = updated.heightCm
+                        profile.currentWeightKg = updated.currentWeightKg
+                    }
+                }
             case .goal:
-                GoalEditSheet(profile: profile, status: $statusMessage)
+                GoalEditSheet(profile: profile, status: $statusMessage) { updated in
+                    store.updateProfile { profile in
+                        profile.goalRawValue = updated.goalRawValue
+                        profile.currentWeightKg = updated.currentWeightKg
+                        profile.targetWeightKg = updated.targetWeightKg
+                        profile.activityLevel = updated.activityLevel
+                    }
+                }
             case .nutrition:
                 SimpleInfoSheet(title: "Питание", rows: ["Аллергии: \(profile.allergies.isEmpty ? "не указаны" : profile.allergies)", "Исключенные продукты: \(profile.excludedFoods.isEmpty ? "нет" : profile.excludedFoods)", "Приемов пищи: \(profile.preferredMealsPerDay)"])
             case .training:
@@ -63,7 +73,7 @@ struct SettingsView: View {
     }
 
     private var profile: UserProfile {
-        profiles.first ?? UserProfile(
+        store.profile ?? UserProfile(
             name: "Александр",
             birthDate: Calendar.current.date(byAdding: .year, value: -28, to: .now) ?? .now,
             sex: .male,
@@ -253,14 +263,14 @@ struct SettingsView: View {
                     GradientProgressBar(progress: 0.45, tint: AppColors.green, height: 8)
                     HStack {
                         Text("Осталось: ")
-                            .foregroundStyle(AppColors.secondaryText)
+                            .foregroundColor(AppColors.secondaryText)
                         + Text("\(String(format: "%.1f", abs(profile.currentWeightKg - profile.targetWeightKg))) кг")
-                            .foregroundStyle(.white)
+                            .foregroundColor(.white)
                         Spacer()
                         Text("Ориентировочная дата: ")
-                            .foregroundStyle(AppColors.secondaryText)
+                            .foregroundColor(AppColors.secondaryText)
                         + Text("15 нояб. 2026")
-                            .foregroundStyle(AppColors.purple)
+                            .foregroundColor(AppColors.purple)
                     }
                     .font(.system(size: 16, weight: .medium))
                 }
@@ -302,17 +312,14 @@ struct SettingsView: View {
     private var exportRows: [String] {
         [
             "Профиль: \(profile.name), \(profile.currentWeightKg) кг → \(profile.targetWeightKg) кг",
-            "Приемов пищи: \(meals.count)",
-            "Записей веса/воды: \(metrics.count)",
-            "Тренировок: \(workouts.count)"
+            "Приемов пищи: \(store.meals.count)",
+            "Записей веса/воды: \(store.metrics.count)",
+            "Тренировок: \(store.workouts.count)"
         ]
     }
 
     private func deleteAllData() {
-        meals.forEach(modelContext.delete)
-        metrics.forEach(modelContext.delete)
-        workouts.forEach(modelContext.delete)
-        try? modelContext.save()
+        store.deleteDiaryProgressAndWorkouts()
         statusMessage = "Дневник, прогресс и тренировки удалены. Профиль сохранен."
     }
 }
@@ -588,25 +595,43 @@ private struct AliceAISettingsSheet: View {
 
 private struct ProfileDataEditSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Bindable var profile: UserProfile
+    let profile: UserProfile
     @Binding var status: String
+    let onSave: (ProfileDataUpdate) -> Void
+
+    @State private var name: String
+    @State private var birthDate: Date
+    @State private var sexRawValue: String
+    @State private var heightCm: String
+    @State private var currentWeightKg: String
     @State private var validation = ""
+
+    init(profile: UserProfile, status: Binding<String>, onSave: @escaping (ProfileDataUpdate) -> Void) {
+        self.profile = profile
+        self._status = status
+        self.onSave = onSave
+        _name = State(initialValue: profile.name)
+        _birthDate = State(initialValue: profile.birthDate)
+        _sexRawValue = State(initialValue: profile.sexRawValue)
+        _heightCm = State(initialValue: String(format: "%.1f", profile.heightCm))
+        _currentWeightKg = State(initialValue: String(format: "%.1f", profile.currentWeightKg))
+    }
 
     var body: some View {
         FoodFormShell(title: "Мои данные") {
-            PremiumTextField(placeholder: "Имя", text: $profile.name)
-            DatePicker("Дата рождения", selection: $profile.birthDate, displayedComponents: .date)
+            PremiumTextField(placeholder: "Имя", text: $name)
+            DatePicker("Дата рождения", selection: $birthDate, displayedComponents: .date)
                 .datePickerStyle(.compact)
                 .foregroundStyle(.white)
                 .tint(AppColors.purple)
-            Picker("Пол", selection: $profile.sexRawValue) {
+            Picker("Пол", selection: $sexRawValue) {
                 ForEach(BiologicalSex.allCases) { sex in
                     Text(sex.rawValue).tag(sex.rawValue)
                 }
             }
             .pickerStyle(.segmented)
-            PremiumTextField(placeholder: "Рост, см", text: doubleBinding(\.heightCm), keyboard: .decimalPad)
-            PremiumTextField(placeholder: "Текущий вес, кг", text: doubleBinding(\.currentWeightKg), keyboard: .decimalPad)
+            PremiumTextField(placeholder: "Рост, см", text: $heightCm, keyboard: .decimalPad)
+            PremiumTextField(placeholder: "Текущий вес, кг", text: $currentWeightKg, keyboard: .decimalPad)
 
             if !validation.isEmpty {
                 Text(validation)
@@ -615,53 +640,73 @@ private struct ProfileDataEditSheet: View {
             }
 
             PremiumButton(title: "Сохранить", icon: "checkmark", tint: AppColors.green) {
-                guard validate() else { return }
-                profile.updatedAt = .now
+                guard let update = validate() else { return }
+                onSave(update)
                 status = "Профиль обновлен"
                 dismiss()
             }
         }
     }
 
-    private func validate() -> Bool {
-        if profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+    private func validate() -> ProfileDataUpdate? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parsedHeight = settingsNumber(heightCm)
+        let parsedWeight = settingsNumber(currentWeightKg)
+        let age = Calendar.current.dateComponents([.year], from: birthDate, to: .now).year ?? 0
+
+        if trimmedName.isEmpty {
             validation = "Имя не должно быть пустым."
-            return false
+            return nil
         }
-        if !(120...230).contains(profile.heightCm) {
+        if !(120...230).contains(parsedHeight) {
             validation = "Укажите реальный рост: 120-230 см."
-            return false
+            return nil
         }
-        if !(35...250).contains(profile.currentWeightKg) {
+        if !(35...250).contains(parsedWeight) {
             validation = "Укажите реальный вес: 35-250 кг."
-            return false
+            return nil
         }
-        if !(10...100).contains(profile.age) {
+        if !(10...100).contains(age) {
             validation = "Проверьте дату рождения."
-            return false
+            return nil
         }
         validation = ""
-        return true
-    }
-
-    private func doubleBinding(_ keyPath: ReferenceWritableKeyPath<UserProfile, Double>) -> Binding<String> {
-        Binding(
-            get: { String(format: "%.1f", profile[keyPath: keyPath]) },
-            set: { profile[keyPath: keyPath] = Double($0.replacingOccurrences(of: ",", with: ".")) ?? profile[keyPath: keyPath] }
+        return ProfileDataUpdate(
+            name: trimmedName,
+            birthDate: birthDate,
+            sexRawValue: sexRawValue,
+            heightCm: parsedHeight,
+            currentWeightKg: parsedWeight
         )
     }
 }
 
 private struct GoalEditSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Bindable var profile: UserProfile
+    let profile: UserProfile
     @Binding var status: String
+    let onSave: (GoalDataUpdate) -> Void
+
+    @State private var goalRawValue: String
+    @State private var currentWeightKg: String
+    @State private var targetWeightKg: String
+    @State private var activityLevel: String
     @State private var validation = ""
     @State private var confirmReset = false
 
+    init(profile: UserProfile, status: Binding<String>, onSave: @escaping (GoalDataUpdate) -> Void) {
+        self.profile = profile
+        self._status = status
+        self.onSave = onSave
+        _goalRawValue = State(initialValue: profile.goalRawValue)
+        _currentWeightKg = State(initialValue: String(format: "%.1f", profile.currentWeightKg))
+        _targetWeightKg = State(initialValue: String(format: "%.1f", profile.targetWeightKg))
+        _activityLevel = State(initialValue: String(format: "%.2f", profile.activityLevel))
+    }
+
     var body: some View {
         FoodFormShell(title: "Изменить цель") {
-            Picker("Цель", selection: $profile.goalRawValue) {
+            Picker("Цель", selection: $goalRawValue) {
                 ForEach(FitnessGoal.allCases) { goal in
                     Text(goal.rawValue).tag(goal.rawValue)
                 }
@@ -669,11 +714,12 @@ private struct GoalEditSheet: View {
             .pickerStyle(.menu)
             .tint(AppColors.purple)
 
-            PremiumTextField(placeholder: "Текущий вес, кг", text: doubleBinding(\.currentWeightKg), keyboard: .decimalPad)
-            PremiumTextField(placeholder: "Целевой вес, кг", text: doubleBinding(\.targetWeightKg), keyboard: .decimalPad)
-            PremiumTextField(placeholder: "Активность TDEE множитель", text: doubleBinding(\.activityLevel), keyboard: .decimalPad)
+            PremiumTextField(placeholder: "Текущий вес, кг", text: $currentWeightKg, keyboard: .decimalPad)
+            PremiumTextField(placeholder: "Целевой вес, кг", text: $targetWeightKg, keyboard: .decimalPad)
+            PremiumTextField(placeholder: "Активность TDEE множитель", text: $activityLevel, keyboard: .decimalPad)
 
-            let targets = NutritionCalculator.targets(for: profile)
+            let preview = previewProfile
+            let targets = NutritionCalculator.targets(for: preview)
             PremiumCard(padding: 14, radius: 16) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text("Новые цели")
@@ -693,8 +739,8 @@ private struct GoalEditSheet: View {
             }
 
             PremiumButton(title: "Сохранить цель", icon: "checkmark", tint: AppColors.green) {
-                guard validate() else { return }
-                profile.updatedAt = .now
+                guard let update = validate() else { return }
+                onSave(update)
                 status = "Цель обновлена"
                 dismiss()
             }
@@ -707,9 +753,8 @@ private struct GoalEditSheet: View {
         }
         .confirmationDialog("Сбросить цель?", isPresented: $confirmReset) {
             Button("Сбросить", role: .destructive) {
-                profile.goalRawValue = FitnessGoal.maintenance.rawValue
-                profile.targetWeightKg = profile.currentWeightKg
-                profile.updatedAt = .now
+                let current = settingsNumber(currentWeightKg)
+                onSave(GoalDataUpdate(goalRawValue: FitnessGoal.maintenance.rawValue, currentWeightKg: current, targetWeightKg: current, activityLevel: settingsNumber(activityLevel)))
                 status = "Цель сброшена"
                 dismiss()
             }
@@ -717,29 +762,64 @@ private struct GoalEditSheet: View {
         }
     }
 
-    private func validate() -> Bool {
-        if !(35...250).contains(profile.currentWeightKg) {
-            validation = "Текущий вес должен быть 35-250 кг."
-            return false
-        }
-        if !(35...250).contains(profile.targetWeightKg) {
-            validation = "Целевой вес должен быть 35-250 кг."
-            return false
-        }
-        if !(1.2...2.2).contains(profile.activityLevel) {
-            validation = "Активность должна быть примерно 1.2-2.2."
-            return false
-        }
-        validation = ""
-        return true
-    }
-
-    private func doubleBinding(_ keyPath: ReferenceWritableKeyPath<UserProfile, Double>) -> Binding<String> {
-        Binding(
-            get: { String(format: "%.1f", profile[keyPath: keyPath]) },
-            set: { profile[keyPath: keyPath] = Double($0.replacingOccurrences(of: ",", with: ".")) ?? profile[keyPath: keyPath] }
+    private var previewProfile: UserProfile {
+        UserProfile(
+            id: profile.id,
+            name: profile.name,
+            birthDate: profile.birthDate,
+            sex: profile.sex,
+            heightCm: profile.heightCm,
+            currentWeightKg: settingsNumber(currentWeightKg),
+            targetWeightKg: settingsNumber(targetWeightKg),
+            goal: FitnessGoal(rawValue: goalRawValue) ?? profile.goal,
+            activityLevel: settingsNumber(activityLevel),
+            trainingDaysPerWeek: profile.trainingDaysPerWeek,
+            preferredMealsPerDay: profile.preferredMealsPerDay,
+            sleepTime: profile.sleepTime,
+            wakeTime: profile.wakeTime,
+            allergies: profile.allergies,
+            excludedFoods: profile.excludedFoods
         )
     }
+
+    private func validate() -> GoalDataUpdate? {
+        let current = settingsNumber(currentWeightKg)
+        let target = settingsNumber(targetWeightKg)
+        let activity = settingsNumber(activityLevel)
+        if !(35...250).contains(current) {
+            validation = "Текущий вес должен быть 35-250 кг."
+            return nil
+        }
+        if !(35...250).contains(target) {
+            validation = "Целевой вес должен быть 35-250 кг."
+            return nil
+        }
+        if !(1.2...2.2).contains(activity) {
+            validation = "Активность должна быть примерно 1.2-2.2."
+            return nil
+        }
+        validation = ""
+        return GoalDataUpdate(goalRawValue: goalRawValue, currentWeightKg: current, targetWeightKg: target, activityLevel: activity)
+    }
+}
+
+private struct ProfileDataUpdate {
+    let name: String
+    let birthDate: Date
+    let sexRawValue: String
+    let heightCm: Double
+    let currentWeightKg: Double
+}
+
+private struct GoalDataUpdate {
+    let goalRawValue: String
+    let currentWeightKg: Double
+    let targetWeightKg: Double
+    let activityLevel: Double
+}
+
+private func settingsNumber(_ text: String) -> Double {
+    Double(text.replacingOccurrences(of: ",", with: ".")) ?? 0
 }
 
 private struct SecuritySheet: View {

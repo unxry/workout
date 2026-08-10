@@ -1,15 +1,14 @@
-import SwiftData
 import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
-    @Query(sort: \UserProfile.createdAt) private var profiles: [UserProfile]
+    @EnvironmentObject private var store: LocalDataStore
 
     var body: some View {
         ZStack {
             PremiumBackground()
 
-            if profiles.first == nil {
+            if store.profile == nil {
                 OnboardingView()
             } else {
                 MainTabView()

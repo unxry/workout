@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 enum FitnessGoal: String, Codable, CaseIterable, Identifiable {
     case fatLoss = "Похудение"
@@ -19,9 +18,8 @@ enum BiologicalSex: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-@Model
-final class UserProfile {
-    @Attribute(.unique) var id: UUID
+final class UserProfile: Identifiable, Codable {
+    var id: UUID
     var name: String
     var birthDate: Date
     var sexRawValue: String
@@ -88,9 +86,8 @@ final class UserProfile {
     }
 }
 
-@Model
-final class DailyMetric {
-    @Attribute(.unique) var id: UUID
+final class DailyMetric: Identifiable, Codable {
+    var id: UUID
     var date: Date
     var weightKg: Double
     var steps: Int
@@ -120,9 +117,8 @@ final class DailyMetric {
     }
 }
 
-@Model
-final class MealEntry {
-    @Attribute(.unique) var id: UUID
+final class MealEntry: Identifiable, Codable {
+    var id: UUID
     var date: Date
     var title: String
     var calories: Double
@@ -152,9 +148,8 @@ final class MealEntry {
     }
 }
 
-@Model
-final class CoachMemory {
-    @Attribute(.unique) var id: UUID
+final class CoachMemory: Identifiable, Codable {
+    var id: UUID
     var createdAt: Date
     var kind: String
     var content: String
@@ -169,9 +164,8 @@ final class CoachMemory {
     }
 }
 
-@Model
-final class WorkoutLog {
-    @Attribute(.unique) var id: UUID
+final class WorkoutLog: Identifiable, Codable {
+    var id: UUID
     var date: Date
     var title: String
     var durationMinutes: Int

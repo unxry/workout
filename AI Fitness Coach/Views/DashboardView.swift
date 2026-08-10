@@ -1,12 +1,9 @@
 import Charts
-import SwiftData
 import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject private var appState: AppState
-    @Query(sort: \UserProfile.createdAt) private var profiles: [UserProfile]
-    @Query(sort: \MealEntry.date, order: .reverse) private var meals: [MealEntry]
-    @Query(sort: \DailyMetric.date) private var metrics: [DailyMetric]
+    @EnvironmentObject private var store: LocalDataStore
 
     @State private var showReminders = false
     @State private var showPlan = false
@@ -39,14 +36,14 @@ struct DashboardView: View {
         }
     }
 
-    private var profile: UserProfile? { profiles.first }
+    private var profile: UserProfile? { store.profile }
     private var targets: NutritionTargets {
         if let profile { return NutritionCalculator.targets(for: profile) }
         return NutritionTargets(bmr: 1650, tdee: 2600, calories: 2900, protein: 125, fat: 75, carbs: 400, waterLiters: 2.5, weeklyWeightDelta: -0.4, goalDate: .now)
     }
 
     private var todayMeals: [MealEntry] {
-        meals.filter { Calendar.current.isDateInToday($0.date) }
+        store.meals.filter { Calendar.current.isDateInToday($0.date) }
     }
 
     private var totals: MacroTotals {
@@ -212,8 +209,8 @@ struct DashboardView: View {
     private var targetWeight: Double { profile?.targetWeightKg ?? 67.0 }
 
     private var weightPoints: [WeightVisualPoint] {
-        if metrics.count >= 3 {
-            let recent = metrics.suffix(3)
+        if store.metrics.count >= 3 {
+            let recent = store.metrics.suffix(3)
             return recent.enumerated().map { index, metric in
                 WeightVisualPoint(label: ["01.08", "03.08", "05.08"][min(index, 2)], value: metric.weightKg)
             }

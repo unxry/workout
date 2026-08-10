@@ -16,6 +16,7 @@
 		31A048E98C1D6A05E6C56470 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 70B22FD649D470E7B12E51BF /* Assets.xcassets */; };
 		48EACC0C44A5EB5315070061 /* SpeechRecognitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F22E28FD63CD8B52D8B26D62 /* SpeechRecognitionService.swift */; };
 		4A15325CA8B4392DF63A169A /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7EC5BD3EEE4F5E6ECA7BCBE /* NotificationService.swift */; };
+		5B49B490655F465D93B6B751 /* LocalDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B49B48F655F465D93B6B751 /* LocalDataStore.swift */; };
 		601BCCA0F7C8F3092C79E8FF /* FitnessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787D581BD9CB73230A6CADC1 /* FitnessModels.swift */; };
 		6F830D221E2F08F4CF09FC64 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 981163C5A3CEA4B6525FBF6B /* AppState.swift */; };
 		7151420104926619B1B9293A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F8A1C25C38D37F077A2A71 /* SettingsView.swift */; };
@@ -58,6 +59,7 @@
 		37361C74D3EE0B7DF17E5E4C /* CameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPicker.swift; sourceTree = "<group>"; };
 		49F8A1C25C38D37F077A2A71 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		4F01305EE26D8C8823BF05D9 /* PremiumComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumComponents.swift; sourceTree = "<group>"; };
+		5B49B48F655F465D93B6B751 /* LocalDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDataStore.swift; sourceTree = "<group>"; };
 		5343C2B58235E47107E88F2E /* AI Fitness CoachUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = "AI Fitness CoachUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		62325E98F6EB9AC916B0C4EF /* AI Fitness CoachTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = "AI Fitness CoachTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		70B22FD649D470E7B12E51BF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -126,6 +128,7 @@
 				D7EC5BD3EEE4F5E6ECA7BCBE /* NotificationService.swift */,
 				D4AED252C4F1BC0789FD1A6C /* NutritionCalculator.swift */,
 				78582ED9A81B35731F0218DC /* AIProvider.swift */,
+				5B49B48F655F465D93B6B751 /* LocalDataStore.swift */,
 				F22E28FD63CD8B52D8B26D62 /* SpeechRecognitionService.swift */,
 			);
 			path = Services;
@@ -334,6 +337,7 @@
 				DCA207B16EB1E1CD08C5FDCE /* NutritionView.swift in Sources */,
 				BF6F7C7C080DAA9E90A6C357 /* OnboardingView.swift in Sources */,
 				155F866D9F2BD4BE4AA3086C /* AIProvider.swift in Sources */,
+				5B49B490655F465D93B6B751 /* LocalDataStore.swift in Sources */,
 				C11239A17571CBF196A432A1 /* PremiumComponents.swift in Sources */,
 				0B75A016DCB0A22F9BA260D7 /* ProgressDashboardView.swift in Sources */,
 				D4C2DF0412B2B3EE0E01C8B6 /* RootView.swift in Sources */,
@@ -554,7 +558,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -616,7 +620,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

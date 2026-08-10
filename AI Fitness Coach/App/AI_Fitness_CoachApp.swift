@@ -1,32 +1,16 @@
-import SwiftData
 import SwiftUI
 
 @main
 struct AIFitnessCoachApp: App {
-    private let modelContainer: ModelContainer
-
     @StateObject private var appState = AppState()
-
-    init() {
-        do {
-            modelContainer = try ModelContainer(
-                for: UserProfile.self,
-                DailyMetric.self,
-                MealEntry.self,
-                CoachMemory.self,
-                WorkoutLog.self
-            )
-        } catch {
-            fatalError("SwiftData container failed: \(error)")
-        }
-    }
+    @StateObject private var store = LocalDataStore()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
+                .environmentObject(store)
                 .preferredColorScheme(.dark)
         }
-        .modelContainer(modelContainer)
     }
 }

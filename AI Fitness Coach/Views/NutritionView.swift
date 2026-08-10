@@ -1,13 +1,10 @@
 import PhotosUI
-import SwiftData
 import SwiftUI
 import UIKit
 
 struct NutritionView: View {
     @EnvironmentObject private var appState: AppState
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \UserProfile.createdAt) private var profiles: [UserProfile]
-    @Query(sort: \MealEntry.date, order: .reverse) private var meals: [MealEntry]
+    @EnvironmentObject private var store: LocalDataStore
 
     @State private var activeSheet: NutritionSheet?
     @State private var mealMessage = ""
@@ -64,7 +61,7 @@ struct NutritionView: View {
         }
     }
 
-    private var profile: UserProfile? { profiles.first }
+    private var profile: UserProfile? { store.profile }
 
     private var nutritionHeader: some View {
         HStack(alignment: .top) {
@@ -101,7 +98,7 @@ struct NutritionView: View {
     }
 
     private var todayMeals: [MealEntry] {
-        meals.filter { Calendar.current.isDateInToday($0.date) }
+        store.meals.filter { Calendar.current.isDateInToday($0.date) }
     }
 
     private var totals: MacroTotals {
@@ -259,8 +256,7 @@ struct NutritionView: View {
                     saveMeal(MealDraft(title: row.title, calories: row.calories, protein: row.protein, fat: row.fat, carbs: row.carbs, source: "repeat"))
                 }, deleteAction: {
                     if let meal = row.entry {
-                        modelContext.delete(meal)
-                        try? modelContext.save()
+                        store.deleteMeal(meal)
                         mealMessage = "Прием пищи удален"
                     } else {
                         mealMessage = "Демо-прием нельзя удалить, добавь свой прием пищи"
@@ -325,8 +321,7 @@ struct NutritionView: View {
     }
 
     private func saveMeal(_ draft: MealDraft) {
-        modelContext.insert(MealEntry(title: draft.title, calories: draft.calories, protein: draft.protein, fat: draft.fat, carbs: draft.carbs, source: draft.source))
-        try? modelContext.save()
+        store.addMeal(MealEntry(title: draft.title, calories: draft.calories, protein: draft.protein, fat: draft.fat, carbs: draft.carbs, source: draft.source))
         Haptics.success()
         mealMessage = "\(draft.title) добавлено"
     }
@@ -642,7 +637,7 @@ private struct PhotoFoodSheet: View {
                 }
             }
         }
-        .onChange(of: pickerItem) { _, newItem in
+        .onChange(of: pickerItem) { newItem in
             Task {
                 guard let data = try? await newItem?.loadTransferable(type: Data.self), let uiImage = UIImage(data: data) else { return }
                 setSelectedImage(uiImage)
@@ -774,10 +769,10 @@ private struct VoiceFoodSheet: View {
                 }
             }
         }
-        .onChange(of: speech.transcript) { _, value in
+        .onChange(of: speech.transcript) { value in
             transcript = value
         }
-        .onChange(of: speech.errorMessage) { _, value in
+        .onChange(of: speech.errorMessage) { value in
             errorMessage = value
         }
         .onDisappear {
