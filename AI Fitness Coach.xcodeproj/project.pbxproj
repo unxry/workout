@@ -70,7 +70,7 @@
 		955A9C1E39AC7F73CD180122 /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
 		981163C5A3CEA4B6525FBF6B /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		99D8468C3554CA974360267B /* ImagePreparationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePreparationService.swift; sourceTree = "<group>"; };
-		CECBA1D022F3C340C9703BE8 /* AI Fitness Coach.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "AI Fitness Coach.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CECBA1D022F3C340C9703BE8 /* AI Fitness Coach.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AI Fitness Coach.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D07F155F1BE546DAC89464A3 /* CoachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachView.swift; sourceTree = "<group>"; };
 		D4AED252C4F1BC0789FD1A6C /* NutritionCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionCalculator.swift; sourceTree = "<group>"; };
 		D7EC5BD3EEE4F5E6ECA7BCBE /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
@@ -366,6 +366,7 @@
 				CODE_SIGN_ENTITLEMENTS = "AI Fitness Coach/Resources/AI Fitness Coach.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 62UBRUWU6H;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "AI Fitness Coach/Resources/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "AI Fitness Coach";
@@ -420,6 +421,7 @@
 				CODE_SIGN_ENTITLEMENTS = "AI Fitness Coach/Resources/AI Fitness Coach.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 62UBRUWU6H;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "AI Fitness Coach/Resources/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "AI Fitness Coach";
