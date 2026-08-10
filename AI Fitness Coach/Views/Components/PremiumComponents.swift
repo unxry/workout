@@ -132,7 +132,7 @@ struct SectionHeader: View {
 struct PageHeader: View {
     let title: String
     var subtitle: String?
-    var aiTitle: String = "ИИ-помощник"
+    var aiTitle: String = "Алиса AI"
     var aiIcon: String = "sparkles"
     var aiAction: () -> Void
 
@@ -215,36 +215,40 @@ struct MetricCard: View {
     let tint: Color
 
     var body: some View {
-        PremiumCard(padding: 14, radius: 19) {
-            VStack(alignment: .leading, spacing: 9) {
+        PremiumCard(padding: 15, radius: 19) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(title)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(AppColors.secondaryText)
+                    .lineLimit(1)
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(value)
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.system(size: 21, weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .minimumScaleFactor(0.82)
+                        .layoutPriority(1)
                     Text("/ \(target)")
-                        .font(.system(size: 15, weight: .regular))
+                        .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(AppColors.secondaryText)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
+                        .minimumScaleFactor(0.78)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                GradientProgressBar(progress: progress, tint: tint, height: 7)
+                GradientProgressBar(progress: progress, tint: tint, height: 5)
+                    .padding(.top, 2)
 
                 Text("\(Int((progress * 100).rounded()))% цели")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(AppColors.secondaryText)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.76)
+                    .minimumScaleFactor(0.82)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(minHeight: 108)
+        .frame(minHeight: 112)
     }
 }
 
@@ -266,11 +270,17 @@ struct GradientProgressBar: View {
                             endPoint: .trailing
                         )
                     )
-                    .frame(width: max(height, proxy.size.width * min(max(progress, 0), 1.18)))
-                    .shadow(color: tint.opacity(0.42), radius: 5, x: 0, y: 0)
+                    .frame(width: max(height, proxy.size.width * min(max(progress, 0), 1)))
+                    .shadow(color: tint.opacity(0.24), radius: 2, x: 0, y: 0)
             }
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.035), lineWidth: 0.5)
+            )
         }
         .frame(height: height)
+        .clipped()
     }
 }
 
@@ -406,17 +416,13 @@ struct PremiumTabBar: View {
     @Binding var selected: CoachTab
     var plusAction: () -> Void
 
-    private var trailingTab: CoachTab {
-        selected == .coach ? .coach : .profile
-    }
-
     var body: some View {
         HStack(spacing: 0) {
             tabButton(.home)
             tabButton(.nutrition)
             plusButton
-            tabButton(.progress)
-            tabButton(trailingTab)
+            tabButton(.coach)
+            tabButton(.profile)
         }
         .padding(.horizontal, 18)
         .padding(.top, 13)
@@ -451,14 +457,14 @@ struct PremiumTabBar: View {
                     .stroke(AppColors.purple, lineWidth: 3)
                     .frame(width: 58, height: 58)
                     .shadow(color: AppColors.purple.opacity(0.35), radius: 12)
-                Image(systemName: "plus")
-                    .font(.system(size: 29, weight: .light))
+                Image(systemName: "sparkles")
+                    .font(.system(size: 25, weight: .semibold))
                     .foregroundStyle(.white)
             }
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("AI quick composer")
+        .accessibilityLabel("Алиса quick composer")
         .accessibilityIdentifier("tab.plus.ai")
     }
 

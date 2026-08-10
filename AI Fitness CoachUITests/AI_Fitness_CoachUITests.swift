@@ -16,40 +16,16 @@ final class AI_Fitness_CoachUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Питание"].waitForExistence(timeout: 3))
         capture("nutrition")
 
-        openCoachFromHeader()
-        XCTAssertTrue(app.staticTexts["ИИ-помощник"].waitForExistence(timeout: 3))
+        openAliceFromHeader()
+        XCTAssertTrue(app.staticTexts["Алиса"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Т\\nр'")).firstMatch.exists)
-        capture("ai")
+        capture("alice")
 
         tapTab("plus.ai")
-        XCTAssertTrue(app.staticTexts["Задать вопрос ИИ"].waitForExistence(timeout: 3))
-        capture("ai-quick-composer")
-        if app.buttons["Открыть полный чат"].exists {
-            app.buttons["Открыть полный чат"].tap()
-        }
-
-        tapTab("progress")
-        XCTAssertTrue(app.staticTexts["Тренировки"].waitForExistence(timeout: 3))
-        capture("workout")
-
-        let startButton = app.buttons["Начать тренировку"].firstMatch
-        XCTAssertTrue(startButton.waitForExistence(timeout: 3))
-        startButton.tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Жим'")).firstMatch.waitForExistence(timeout: 3))
-        sleep(2)
-        capture("active-workout")
-
-        app.buttons["Завершить подход"].tap()
-        XCTAssertTrue(app.staticTexts["Rest"].waitForExistence(timeout: 3))
-        sleep(2)
-        capture("rest-timer")
-        if app.buttons["rest.add30"].exists { app.buttons["rest.add30"].tap() }
-        if app.buttons["rest.pause"].exists { app.buttons["rest.pause"].tap() }
-        if app.buttons["rest.resume"].exists { app.buttons["rest.resume"].tap() }
-        if app.buttons["rest.skip"].exists { app.buttons["rest.skip"].tap() }
-
-        if app.buttons["Закрыть"].waitForExistence(timeout: 2) {
-            app.buttons["Закрыть"].tap()
+        XCTAssertTrue(app.staticTexts["Алиса"].waitForExistence(timeout: 3))
+        capture("alice-quick-composer")
+        if app.buttons["Открыть Алису"].exists {
+            app.buttons["Открыть Алису"].tap()
         }
 
         tapTab("profile")
@@ -74,9 +50,9 @@ final class AI_Fitness_CoachUITests: XCTestCase {
         button.tap()
     }
 
-    private func openCoachFromHeader() {
-        let button = app.buttons["ai.helper.ИИ-помощник"].firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 3), "Missing AI helper button")
+    private func openAliceFromHeader() {
+        let button = app.buttons["ai.helper.Алиса AI"].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 3), "Missing Alice helper button")
         button.tap()
     }
 

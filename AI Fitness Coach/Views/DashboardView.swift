@@ -29,9 +29,9 @@ struct DashboardView: View {
         .sheet(isPresented: $showPlan) {
             SimpleInfoSheet(title: "План на день", rows: [
                 "Питание: держим цель по калориям и белку.",
-                "Тренировка: верх тела, 45-60 минут.",
                 "Активность: 10 000 шагов.",
-                "Вода: 2.5 л в течение дня."
+                "Вода: 2.5 л в течение дня.",
+                "Вес: короткая проверка динамики утром."
             ])
         }
         .sheet(isPresented: $showReminders) {
@@ -80,7 +80,7 @@ struct DashboardView: View {
 
             Spacer()
 
-            AIHelperButton(title: "ИИ-помощник") {
+            AIHelperButton(title: "Алиса AI") {
                 appState.selectedTab = .coach
             }
             .padding(.top, 4)
@@ -114,7 +114,7 @@ struct DashboardView: View {
 
     private var aiRecommendation: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(title: "РЕКОМЕНДАЦИИ ИИ")
+            SectionHeader(title: "РЕКОМЕНДАЦИЯ АЛИСЫ")
             PremiumCard(padding: 18, radius: 20) {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 18) {
@@ -148,7 +148,7 @@ struct DashboardView: View {
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(AppColors.green)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Хочешь подсказку по питанию или тренировке?")
+            Text("Хочешь подсказку по питанию или прогрессу?")
                 .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(AppColors.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -159,9 +159,9 @@ struct DashboardView: View {
     private var aiAskButton: some View {
         Button {
             Haptics.tap()
-            appState.openCoach(with: "Дай подсказку по питанию или тренировке на сегодня.")
+            appState.openAlice(with: "Дай подсказку по питанию и прогрессу на сегодня.")
         } label: {
-            Text("Спросить ИИ")
+            Text("Спросить Алису")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(height: 44)
@@ -182,9 +182,9 @@ struct DashboardView: View {
             SectionHeader(title: "ПЛАН НА ДЕНЬ", actionTitle: "См. все") { showPlan = true }
             VStack(spacing: 6) {
                 DashboardPlanRow(icon: "fork.knife", title: "Питание", value: "\(Int(totals.calories)) / \(Int(targets.calories)) ккал", percent: Int((totals.calories / targets.calories * 100).rounded()), progress: totals.calories / targets.calories, tint: AppColors.green)
-                DashboardPlanRow(icon: "dumbbell", title: "Тренировка", value: "450 / 400 ккал", percent: 112, progress: 1.12, tint: AppColors.purple)
                 DashboardPlanRow(icon: "figure.walk", title: "Активность", value: "8 250 / 10 000 шагов", percent: 82, progress: 0.82, tint: AppColors.yellow)
                 DashboardPlanRow(icon: "drop.fill", title: "Вода", value: "1.8 / \(String(format: "%.1f", targets.waterLiters)) л", percent: 72, progress: 0.72, tint: AppColors.blue)
+                DashboardPlanRow(icon: "scalemass", title: "Вес", value: "\(String(format: "%.1f", currentWeight)) / \(String(format: "%.1f", targetWeight)) кг", percent: Int(NutritionCalculator.progress(current: currentWeight, target: targetWeight) * 100), progress: NutritionCalculator.progress(current: currentWeight, target: targetWeight), tint: AppColors.purple)
             }
         }
     }
@@ -203,7 +203,7 @@ struct DashboardView: View {
     private var reminders: [ReminderItem] {
         [
             ReminderItem(icon: "bell", tint: AppColors.blue, title: "Выпей воду", subtitle: "Каждые 2 часа", time: "01:00"),
-            ReminderItem(icon: "dumbbell", tint: AppColors.orange, title: "Тренировка", subtitle: "Верх тела • 19:00", time: "19:00"),
+            ReminderItem(icon: "scalemass", tint: AppColors.green, title: "Взвешивание", subtitle: "Утром после пробуждения", time: "08:00"),
             ReminderItem(icon: "capsule.fill", tint: AppColors.orange, title: "Добавка", subtitle: "Омега-3 • После еды", time: "13:00")
         ]
     }

@@ -11,7 +11,7 @@
 		0B75A016DCB0A22F9BA260D7 /* ProgressDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33E97419EA7EE81134BB22CA /* ProgressDashboardView.swift */; };
 		1056499C4A48C8BC179C9921 /* AI_Fitness_CoachApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BB93678F3296B0DBA90FDA8 /* AI_Fitness_CoachApp.swift */; };
 		14A653B0E397ECA74B23EEA0 /* NutritionCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4AED252C4F1BC0789FD1A6C /* NutritionCalculator.swift */; };
-		155F866D9F2BD4BE4AA3086C /* OpenAIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78582ED9A81B35731F0218DC /* OpenAIClient.swift */; };
+		155F866D9F2BD4BE4AA3086C /* AIProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78582ED9A81B35731F0218DC /* AIProvider.swift */; };
 		28BC6EBBE9EE8C60CDC1F55E /* AI_Fitness_CoachUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70E47486B2AFDDB064886794 /* AI_Fitness_CoachUITests.swift */; };
 		31A048E98C1D6A05E6C56470 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 70B22FD649D470E7B12E51BF /* Assets.xcassets */; };
 		48EACC0C44A5EB5315070061 /* SpeechRecognitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F22E28FD63CD8B52D8B26D62 /* SpeechRecognitionService.swift */; };
@@ -63,7 +63,7 @@
 		70B22FD649D470E7B12E51BF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		70E47486B2AFDDB064886794 /* AI_Fitness_CoachUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI_Fitness_CoachUITests.swift; sourceTree = "<group>"; };
 		74ADE2B67DED2E06A8A5C9A9 /* AI_Fitness_CoachTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AI_Fitness_CoachTests.swift; sourceTree = "<group>"; };
-		78582ED9A81B35731F0218DC /* OpenAIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIClient.swift; sourceTree = "<group>"; };
+		78582ED9A81B35731F0218DC /* AIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIProvider.swift; sourceTree = "<group>"; };
 		787D581BD9CB73230A6CADC1 /* FitnessModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessModels.swift; sourceTree = "<group>"; };
 		7C6E5D7950B6B4AA594379C0 /* NutritionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionView.swift; sourceTree = "<group>"; };
 		8B774896C0ABF8E684A7AA74 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
@@ -125,7 +125,7 @@
 				325D1EA712E28C1006E09979 /* KeychainStore.swift */,
 				D7EC5BD3EEE4F5E6ECA7BCBE /* NotificationService.swift */,
 				D4AED252C4F1BC0789FD1A6C /* NutritionCalculator.swift */,
-				78582ED9A81B35731F0218DC /* OpenAIClient.swift */,
+				78582ED9A81B35731F0218DC /* AIProvider.swift */,
 				F22E28FD63CD8B52D8B26D62 /* SpeechRecognitionService.swift */,
 			);
 			path = Services;
@@ -333,7 +333,7 @@
 				14A653B0E397ECA74B23EEA0 /* NutritionCalculator.swift in Sources */,
 				DCA207B16EB1E1CD08C5FDCE /* NutritionView.swift in Sources */,
 				BF6F7C7C080DAA9E90A6C357 /* OnboardingView.swift in Sources */,
-				155F866D9F2BD4BE4AA3086C /* OpenAIClient.swift in Sources */,
+				155F866D9F2BD4BE4AA3086C /* AIProvider.swift in Sources */,
 				C11239A17571CBF196A432A1 /* PremiumComponents.swift in Sources */,
 				0B75A016DCB0A22F9BA260D7 /* ProgressDashboardView.swift in Sources */,
 				D4C2DF0412B2B3EE0E01C8B6 /* RootView.swift in Sources */,

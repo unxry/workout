@@ -6,29 +6,40 @@ final class AppState: ObservableObject {
     @Published var selectedTab: CoachTab = .home
     @Published var apiKeyStatus: APIKeyStatus = .unknown
     @Published var healthAuthorization: HealthAuthorizationState = .unknown
-    @Published var pendingCoachPrompt: String?
+    @Published var pendingAlicePrompt: String?
 
-    let aiClient = OpenAIClient()
+    let aiClient: AIProvider = YandexAIProvider()
     let healthKit = HealthKitService()
     let notifications = NotificationService()
 
     init() {
-        apiKeyStatus = APIKeyStatus.fromStoredKey(KeychainStore.shared.readOpenAIKey())
+        apiKeyStatus = APIKeyStatus.fromStoredConfiguration()
     }
 
-    func saveOpenAIKey(_ key: String) {
-        KeychainStore.shared.saveOpenAIKey(key.trimmingCharacters(in: .whitespacesAndNewlines))
-        apiKeyStatus = key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .missing : .configured
+    func saveAliceConfiguration(apiKey: String, folderID: String) {
+        KeychainStore.shared.saveYandexAPIKey(apiKey.trimmingCharacters(in: .whitespacesAndNewlines))
+        KeychainStore.shared.saveYandexFolderID(folderID.trimmingCharacters(in: .whitespacesAndNewlines))
+        apiKeyStatus = APIKeyStatus.fromStoredConfiguration()
     }
 
-    func openCoach(with prompt: String) {
-        pendingCoachPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    func deleteAliceConfiguration() {
+        KeychainStore.shared.deleteYandexAPIKey()
+        KeychainStore.shared.deleteYandexFolderID()
+        apiKeyStatus = .missing
+    }
+
+    func refreshAliceStatus() {
+        apiKeyStatus = APIKeyStatus.fromStoredConfiguration()
+    }
+
+    func openAlice(with prompt: String) {
+        pendingAlicePrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         selectedTab = .coach
     }
 
-    func consumePendingCoachPrompt() -> String? {
-        defer { pendingCoachPrompt = nil }
-        guard let prompt = pendingCoachPrompt, !prompt.isEmpty else { return nil }
+    func consumePendingAlicePrompt() -> String? {
+        defer { pendingAlicePrompt = nil }
+        guard let prompt = pendingAlicePrompt, !prompt.isEmpty else { return nil }
         return prompt
     }
 }
@@ -38,8 +49,10 @@ enum APIKeyStatus {
     case missing
     case configured
 
-    static func fromStoredKey(_ key: String) -> APIKeyStatus {
-        key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .missing : .configured
+    static func fromStoredConfiguration() -> APIKeyStatus {
+        let key = KeychainStore.shared.readYandexAPIKey().trimmingCharacters(in: .whitespacesAndNewlines)
+        let folderID = KeychainStore.shared.readYandexFolderID().trimmingCharacters(in: .whitespacesAndNewlines)
+        return key.isEmpty || folderID.isEmpty ? .missing : .configured
     }
 
     var isConfigured: Bool {
@@ -57,7 +70,6 @@ enum CoachTab: String, CaseIterable, Identifiable {
     case home
     case nutrition
     case coach
-    case progress
     case profile
 
     var id: String { rawValue }
@@ -66,8 +78,7 @@ enum CoachTab: String, CaseIterable, Identifiable {
         switch self {
         case .home: "Главная"
         case .nutrition: "Питание"
-        case .coach: "ИИ-помощник"
-        case .progress: "Тренировки"
+        case .coach: "Алиса"
         case .profile: "Профиль"
         }
     }
@@ -77,7 +88,6 @@ enum CoachTab: String, CaseIterable, Identifiable {
         case .home: "house"
         case .nutrition: "fork.knife"
         case .coach: "sparkles"
-        case .progress: "dumbbell"
         case .profile: "person"
         }
     }

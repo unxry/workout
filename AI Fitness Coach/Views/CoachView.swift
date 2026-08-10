@@ -15,7 +15,7 @@ struct CoachView: View {
     @StateObject private var speech = SpeechRecognitionService()
     @State private var message = ""
     @State private var conversation: [CoachBubble] = [
-        .init(role: .coach, text: "Привет. Я готов анализировать питание, тренировки, вес и фото. Напиши вопрос или приложи снимок еды.", time: "сейчас")
+        .init(role: .coach, text: "Привет. Я Алиса AI. Помогу с питанием, калориями, БЖУ, весом, водой, активностью и прогрессом. Напиши вопрос или приложи снимок еды.", time: "сейчас")
     ]
     @State private var isThinking = false
     @State private var showHistory = false
@@ -81,13 +81,13 @@ struct CoachView: View {
             .ignoresSafeArea()
         }
         .onAppear {
-            if let prompt = appState.consumePendingCoachPrompt() {
+            if let prompt = appState.consumePendingAlicePrompt() {
                 message = prompt
                 Task { await send() }
             }
         }
-        .onChange(of: appState.pendingCoachPrompt) { _, _ in
-            if let prompt = appState.consumePendingCoachPrompt() {
+        .onChange(of: appState.pendingAlicePrompt) { _, _ in
+            if let prompt = appState.consumePendingAlicePrompt() {
                 message = prompt
                 Task { await send() }
             }
@@ -115,7 +115,7 @@ struct CoachView: View {
 
     private var headerTitle: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("ИИ-помощник")
+            Text("Алиса")
                 .font(.system(size: 36, weight: .bold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
@@ -123,7 +123,7 @@ struct CoachView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 7) {
                 Circle().fill(AppColors.green).frame(width: 12, height: 12)
-                Text(appState.apiKeyStatus == .configured ? "Онлайн" : "Offline • нужен API key")
+                Text(appState.apiKeyStatus == .configured ? "Онлайн" : "Не настроено • нужен Yandex key")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white.opacity(0.84))
                     .lineLimit(1)
@@ -144,7 +144,7 @@ struct CoachView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(alignment: .center, spacing: 14) {
                         AIAvatarLarge(size: 86)
-                        Text("Привет! Я твой ИИ-тренер.")
+                        Text("Привет! Я Алиса.")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundStyle(.white)
                             .fixedSize(horizontal: false, vertical: true)
@@ -159,7 +159,7 @@ struct CoachView: View {
 
     private var heroText: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text("Привет! Я твой ИИ-тренер.")
+            Text("Привет! Я Алиса.")
                 .font(.system(size: 23, weight: .bold))
                 .foregroundStyle(.white)
                 .fixedSize(horizontal: false, vertical: true)
@@ -169,7 +169,7 @@ struct CoachView: View {
     }
 
     private var heroDescription: some View {
-        Text("Я помогу с питанием, тренировками и мотивацией на основе твоих данных. Спроси меня о чем угодно.")
+        Text("Твой AI-помощник по питанию и прогрессу. Я учитываю цель, калории, БЖУ, вес, воду, шаги и привычки.")
             .font(.system(size: 16, weight: .regular))
             .lineSpacing(4)
             .foregroundStyle(AppColors.secondaryText)
@@ -181,7 +181,7 @@ struct CoachView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 9) {
                 chip("Питание", tint: AppColors.green)
-                chip("Тренировки", tint: AppColors.purple)
+                chip("Калории", tint: AppColors.purple)
                 chip("Прогресс", tint: AppColors.yellow)
                 chip("Здоровье", tint: AppColors.blue)
             }
@@ -198,7 +198,7 @@ struct CoachView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     questionCard(icon: "fork.knife", tint: AppColors.green, text: "Что лучше съесть\nна ужин?")
-                    questionCard(icon: "dumbbell", tint: AppColors.purple, text: "Какую тренировку\nмне сделать?")
+                    questionCard(icon: "flame", tint: AppColors.purple, text: "Сколько калорий\nосталось?")
                     questionCard(icon: "chart.line.uptrend.xyaxis", tint: AppColors.yellow, text: "Почему вес\nне уходит?")
                     questionCard(icon: "drop.fill", tint: AppColors.blue, text: "Сколько воды\nмне осталось?")
                 }
@@ -243,7 +243,7 @@ struct CoachView: View {
                         .scaledToFill()
                         .frame(width: 54, height: 54)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    Text("Фото будет отправлено ИИ вместе с вопросом.")
+                            Text("Фото будет отправлено Алисе вместе с вопросом.")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(AppColors.secondaryText)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -381,7 +381,7 @@ struct CoachView: View {
         let answer: String
         do {
             if let imageData {
-                answer = try await appState.aiClient.answerWithImage(imageData: imageData, context: context)
+                answer = try await appState.aiClient.answerWithImage(imageData: imageData, mimeType: "image/jpeg", context: context)
             } else {
                 answer = try await appState.aiClient.answer(context: context)
             }
@@ -442,7 +442,6 @@ struct CoachView: View {
         let carbs = todayMeals.reduce(0) { $0 + $1.carbs }
         let latestMetric = metrics.last
         let mealSummary = todayMeals.prefix(5).map { "\($0.title): \(Int($0.calories)) ккал" }.joined(separator: "; ")
-        let workoutSummary = workouts.prefix(3).map { "\($0.title), \($0.durationMinutes) мин, \(Int($0.calories)) ккал" }.joined(separator: "; ")
         let trendSummary: String
         if let first = metrics.suffix(7).first, let last = metrics.suffix(7).last {
             trendSummary = "вес \(String(format: "%.1f", first.weightKg)) -> \(String(format: "%.1f", last.weightKg)) кг за последние записи"
@@ -451,9 +450,9 @@ struct CoachView: View {
         }
 
         return CoachContext(
-            profileSummary: profile.map { "\($0.name), цель \($0.goal.rawValue), вес \($0.currentWeightKg), целевой вес \($0.targetWeightKg), рост \($0.heightCm), тренировок/нед \($0.trainingDaysPerWeek)" } ?? "Профиль еще не заполнен",
+            profileSummary: profile.map { "\($0.name), цель \($0.goal.rawValue), вес \($0.currentWeightKg), целевой вес \($0.targetWeightKg), рост \($0.heightCm), возраст \($0.age)" } ?? "Профиль еще не заполнен",
             todayNutrition: targets.map { "цель \(Int($0.calories)) ккал; съедено \(Int(calories)) ккал; Б \(Int(protein))/\(Int($0.protein)) г; Ж \(Int(fat))/\(Int($0.fat)) г; У \(Int(carbs))/\(Int($0.carbs)) г; вода цель \(String(format: "%.1f", $0.waterLiters)) л; последние приемы: \(mealSummary.isEmpty ? "нет записей" : mealSummary)" } ?? "Нет цели",
-            recentTrend: "\(trendSummary); шаги \(Int(latestMetric?.steps ?? 0)); вода \(String(format: "%.1f", latestMetric?.waterLiters ?? 0)) л; сон \(String(format: "%.1f", latestMetric?.sleepHours ?? 0)) ч; последние тренировки: \(workoutSummary.isEmpty ? "нет записей" : workoutSummary)",
+            recentTrend: "\(trendSummary); шаги \(Int(latestMetric?.steps ?? 0)); активная энергия \(Int(latestMetric?.activeEnergyKcal ?? 0)) ккал; вода \(String(format: "%.1f", latestMetric?.waterLiters ?? 0)) л; сон \(String(format: "%.1f", latestMetric?.sleepHours ?? 0)) ч",
             memories: memories.prefix(8).map(\.content),
             userMessage: userMessage
         )

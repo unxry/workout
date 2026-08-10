@@ -5,19 +5,44 @@ final class KeychainStore {
     static let shared = KeychainStore()
 
     private let service = "com.unxry.aifitnesscoach"
-    private let openAIAccount = "openai-api-key"
+    private let yandexAPIKeyAccount = "yandex-api-key"
+    private let yandexFolderIDAccount = "yandex-folder-id"
 
     private init() {}
 
-    func saveOpenAIKey(_ key: String) {
-        deleteOpenAIKey()
+    func saveYandexAPIKey(_ key: String) {
+        save(key, account: yandexAPIKeyAccount)
+    }
 
-        guard !key.isEmpty, let data = key.data(using: .utf8) else { return }
+    func readYandexAPIKey() -> String {
+        read(account: yandexAPIKeyAccount)
+    }
+
+    func deleteYandexAPIKey() {
+        delete(account: yandexAPIKeyAccount)
+    }
+
+    func saveYandexFolderID(_ folderID: String) {
+        save(folderID, account: yandexFolderIDAccount)
+    }
+
+    func readYandexFolderID() -> String {
+        read(account: yandexFolderIDAccount)
+    }
+
+    func deleteYandexFolderID() {
+        delete(account: yandexFolderIDAccount)
+    }
+
+    private func save(_ value: String, account: String) {
+        delete(account: account)
+
+        guard !value.isEmpty, let data = value.data(using: .utf8) else { return }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: openAIAccount,
+            kSecAttrAccount as String: account,
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
@@ -25,11 +50,11 @@ final class KeychainStore {
         SecItemAdd(query as CFDictionary, nil)
     }
 
-    func readOpenAIKey() -> String {
+    private func read(account: String) -> String {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: openAIAccount,
+            kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -41,11 +66,11 @@ final class KeychainStore {
         return String(data: data, encoding: .utf8) ?? ""
     }
 
-    func deleteOpenAIKey() {
+    private func delete(account: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: openAIAccount
+            kSecAttrAccount as String: account
         ]
 
         SecItemDelete(query as CFDictionary)

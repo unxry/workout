@@ -2,7 +2,6 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 import UIKit
-import UIKit
 
 struct NutritionView: View {
     @EnvironmentObject private var appState: AppState
@@ -90,7 +89,7 @@ struct NutritionView: View {
                 .buttonStyle(.plain)
             }
             Spacer()
-            AIHelperButton(title: "ИИ-помощник") {
+            AIHelperButton(title: "Алиса AI") {
                 appState.selectedTab = .coach
             }
             .padding(.top, 10)
@@ -230,7 +229,7 @@ struct NutritionView: View {
 
     private var quickAddGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 82), spacing: 8)], spacing: 8) {
-            QuickActionCard(icon: "camera", title: "Фото еды", subtitle: "ИИ распознает\nблюдо", tint: AppColors.green) { activeSheet = .photo }
+            QuickActionCard(icon: "camera", title: "Фото еды", subtitle: "Алиса распознает\nблюдо", tint: AppColors.green) { activeSheet = .photo }
             QuickActionCard(icon: "mic", title: "Голосом", subtitle: "Просто скажи,\nчто съел", tint: AppColors.purple) { activeSheet = .voice }
             QuickActionCard(icon: "pencil", title: "Вручную", subtitle: "Ввести продукты\nсамому", tint: AppColors.blue) { activeSheet = .manual }
             QuickActionCard(icon: "magnifyingglass", title: "Найти продукт", subtitle: "Поиск в базе\nпродуктов", tint: AppColors.orange) { activeSheet = .search }
@@ -666,7 +665,7 @@ private struct PhotoFoodSheet: View {
         errorMessage = nil
         defer { isAnalyzing = false }
         do {
-            let result = try await appState.aiClient.analyzeFoodImage(imageData: imageData, context: "Пользователь добавляет прием пищи по фото.")
+            let result = try await appState.aiClient.analyzeFoodImage(imageData: imageData, mimeType: "image/jpeg", context: "Пользователь добавляет прием пищи по фото.")
             analysis = result
             if result.isFood, let total = result.total {
                 title = result.items.map(\.name).joined(separator: ", ")

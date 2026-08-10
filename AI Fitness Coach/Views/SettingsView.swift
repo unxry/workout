@@ -45,14 +45,14 @@ struct SettingsView: View {
             case .notifications:
                 NotificationsSettingsSheet(status: $statusMessage)
             case .ai:
-                AIAPISettingsSheet()
+                AliceAISettingsSheet()
                     .environmentObject(appState)
             case .security:
                 SecuritySheet(status: $statusMessage)
             case .privacy:
                 PrivacySheet(exportRows: exportRows, deleteAll: deleteAllData)
             case .about:
-                SimpleInfoSheet(title: "О приложении", rows: ["AI Fitness Coach", "Версия 1.0.0", "Локальные данные + OpenAI API", "Поддержка: GitHub unxry/workout"])
+                SimpleInfoSheet(title: "О приложении", rows: ["AI Fitness Coach", "Версия 1.0.0", "Локальные данные + Yandex AI", "Поддержка: GitHub unxry/workout"])
             }
         }
         .alert("Статус", isPresented: Binding(get: { !statusMessage.isEmpty }, set: { if !$0 { statusMessage = "" } })) {
@@ -90,87 +90,135 @@ struct SettingsView: View {
 
     private var profileCard: some View {
         PremiumCard(padding: 20, radius: 22) {
-            HStack(spacing: 14) {
-                ZStack(alignment: .bottomTrailing) {
-                    Circle()
-                        .fill(
-                            LinearGradient(colors: [Color.white.opacity(0.18), AppColors.purple.opacity(0.28)], startPoint: .top, endPoint: .bottom)
-                        )
-                        .overlay(Circle().stroke(AppColors.purple, lineWidth: 3))
-                        .frame(width: 104, height: 104)
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 54, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.82))
-                        .frame(width: 94, height: 94)
-                        .background(Circle().fill(Color.black.opacity(0.28)))
-                    Button {
-                        statusMessage = "Выбор фото профиля будет открыт на iPhone."
-                    } label: {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(AppColors.purple)
-                            .frame(width: 34, height: 34)
-                            .background(Circle().fill(AppColors.panelDeep).overlay(Circle().stroke(AppColors.purple, lineWidth: 2)))
-                    }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 14) {
+                    profileAvatar(size: 104)
+                    profileTextBlock
+                        .frame(minWidth: 165, maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
+                    Spacer(minLength: 8)
+                    profileProgressCircle(size: 88)
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 10) {
-                        Text(profile.name.isEmpty ? "Александр" : profile.name)
-                            .font(.system(size: 23, weight: .bold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                        Button {
-                            activeSheet = .myData
-                        } label: {
-                            Image(systemName: "pencil")
-                                .foregroundStyle(AppColors.purple)
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .top, spacing: 14) {
+                        profileAvatar(size: 92)
+                        profileTextBlock
+                            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                            .layoutPriority(1)
+                    }
+                    HStack(spacing: 14) {
+                        profileProgressCircle(size: 76)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Цель выполнена на 45%")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .fixedSize(horizontal: false, vertical: true)
+                            GradientProgressBar(progress: 0.45, tint: AppColors.purple, height: 5)
                         }
-                    }
-                    HStack(spacing: 8) {
-                        Text(profile.goal.rawValue)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(AppColors.green)
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.secondaryText)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(AppColors.green.opacity(0.12)))
-
-                    HStack(spacing: 8) {
-                        Text("\(String(format: "%.1f", profile.currentWeightKg)) кг")
-                            .foregroundStyle(.white)
-                        Text("→")
-                            .foregroundStyle(AppColors.secondaryText)
-                        Text("\(String(format: "%.1f", profile.targetWeightKg)) кг")
-                            .foregroundStyle(AppColors.green)
-                    }
-                    .font(.system(size: 22, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-
-                    Text("Прогресс: -4.6 кг")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(AppColors.green)
-                }
-
-                Spacer()
-
-                CircularProgress(progress: 0.45, tint: AppColors.purple, lineWidth: 9, size: 92) {
-                    VStack(spacing: 2) {
-                        Text("45%")
-                            .font(.system(size: 23, weight: .bold))
-                            .foregroundStyle(AppColors.purple)
-                        Text("цели")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
         }
+    }
+
+    private func profileAvatar(size: CGFloat) -> some View {
+        ZStack(alignment: .bottomTrailing) {
+            Circle()
+                .fill(
+                    LinearGradient(colors: [Color.white.opacity(0.18), AppColors.purple.opacity(0.28)], startPoint: .top, endPoint: .bottom)
+                )
+                .overlay(Circle().stroke(AppColors.purple, lineWidth: 3))
+                .frame(width: size, height: size)
+            Image(systemName: "person.fill")
+                .font(.system(size: size * 0.52, weight: .regular))
+                .foregroundStyle(.white.opacity(0.82))
+                .frame(width: size - 10, height: size - 10)
+                .background(Circle().fill(Color.black.opacity(0.28)))
+            Button {
+                statusMessage = "Выбор фото профиля будет открыт на iPhone."
+            } label: {
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(AppColors.purple)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(AppColors.panelDeep).overlay(Circle().stroke(AppColors.purple, lineWidth: 2)))
+            }
+        }
+        .frame(width: size, height: size)
+        .fixedSize()
+    }
+
+    private var profileTextBlock: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text(profile.name.isEmpty ? "Александр" : profile.name)
+                    .font(.system(size: 23, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .layoutPriority(1)
+                Button {
+                    activeSheet = .myData
+                } label: {
+                    Image(systemName: "pencil")
+                        .foregroundStyle(AppColors.purple)
+                        .frame(width: 28, height: 28)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 8) {
+                Text(profile.goal.rawValue)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AppColors.green)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.86)
+                Image(systemName: "chevron.down")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.secondaryText)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Capsule().fill(AppColors.green.opacity(0.12)))
+
+            HStack(spacing: 8) {
+                Text("\(String(format: "%.1f", profile.currentWeightKg)) кг")
+                    .foregroundStyle(.white)
+                    .layoutPriority(1)
+                Text("→")
+                    .foregroundStyle(AppColors.secondaryText)
+                Text("\(String(format: "%.1f", profile.targetWeightKg)) кг")
+                    .foregroundStyle(AppColors.green)
+                    .layoutPriority(1)
+            }
+            .font(.system(size: 21, weight: .bold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.84)
+
+            Text("Прогресс: -4.6 кг")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(AppColors.green)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func profileProgressCircle(size: CGFloat) -> some View {
+        CircularProgress(progress: 0.45, tint: AppColors.purple, lineWidth: size > 80 ? 8 : 7, size: size) {
+            VStack(spacing: 2) {
+                Text("45%")
+                    .font(.system(size: size > 80 ? 22 : 18, weight: .bold))
+                    .foregroundStyle(AppColors.purple)
+                    .lineLimit(1)
+                Text("цели")
+                    .font(.system(size: size > 80 ? 11 : 10, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+            }
+        }
+        .fixedSize()
     }
 
     private var statsGrid: some View {
@@ -291,7 +339,7 @@ enum ProfileSheet: String, CaseIterable, Identifiable {
         case .training: "Тренировки"
         case .health: "Здоровье и разрешения"
         case .notifications: "Уведомления"
-        case .ai: "ИИ и API"
+        case .ai: "Алиса AI"
         case .security: "Безопасность"
         case .privacy: "Конфиденциальность"
         case .about: "О приложении"
@@ -306,7 +354,7 @@ enum ProfileSheet: String, CaseIterable, Identifiable {
         case .training: "Опыт, оборудование, предпочтения"
         case .health: "HealthKit, доступы к данным"
         case .notifications: "Напоминания и оповещения"
-        case .ai: "Настройки ChatGPT API"
+        case .ai: "API key, Folder ID, проверка подключения"
         case .security: "Face ID, код-пароль"
         case .privacy: "Экспорт данных, удалить все данные"
         case .about: "Версия, поддержка, лицензии"
@@ -454,50 +502,66 @@ private struct NotificationsSettingsSheet: View {
     }
 }
 
-private struct AIAPISettingsSheet: View {
+private struct AliceAISettingsSheet: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var key = ""
+    @State private var folderID = ""
     @State private var status = ""
     @State private var isTesting = false
 
     var body: some View {
-        FoodFormShell(title: "ИИ и API") {
-            Text("AI Provider: OpenAI")
+        FoodFormShell(title: "Алиса AI") {
+            Text("Yandex Cloud AI Studio")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
-            Text(appState.apiKeyStatus.isConfigured ? "Ключ сохранен в Keychain." : "Ключ не добавлен. AI-функции покажут понятное сообщение вместо фейкового ответа.")
+            Text(appState.apiKeyStatus.isConfigured ? "Подключение настроено. Секреты хранятся только в Keychain." : "Не настроено. Алиса покажет понятную ошибку вместо фейкового ответа.")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(AppColors.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
-            SecureField("OpenAI API Key", text: $key)
+            SecureField("Yandex API Key", text: $key)
                 .textFieldStyle(.plain)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white)
                 .padding(16)
                 .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.075)))
+            PremiumTextField(placeholder: "Folder ID", text: $folderID)
+            Text("Модель выбирается автоматически: YandexGPT Lite. Фото-анализ не будет имитироваться, пока не подключен официальный vision endpoint.")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(AppColors.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Button("Сохранить") {
-                    appState.saveOpenAIKey(key)
+                    let storedKey = key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? KeychainStore.shared.readYandexAPIKey() : key
+                    let storedFolder = folderID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? KeychainStore.shared.readYandexFolderID() : folderID
+                    appState.saveAliceConfiguration(apiKey: storedKey, folderID: storedFolder)
                     key = ""
-                    status = appState.apiKeyStatus.isConfigured ? "Ключ сохранен" : "Ключ не добавлен"
+                    folderID = ""
+                    status = appState.apiKeyStatus.isConfigured ? "Настройки сохранены" : "Заполните API Key и Folder ID"
                 }
                 Button("Удалить ключ") {
-                    appState.saveOpenAIKey("")
+                    appState.deleteAliceConfiguration()
                     key = ""
+                    folderID = ""
                     status = "Ключ удален"
                 }
                 Button(isTesting ? "Проверяю..." : "Проверить") {
                     Task {
                         let typedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !typedKey.isEmpty {
-                            appState.saveOpenAIKey(typedKey)
+                        let typedFolder = folderID.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !typedKey.isEmpty || !typedFolder.isEmpty {
+                            appState.saveAliceConfiguration(
+                                apiKey: typedKey.isEmpty ? KeychainStore.shared.readYandexAPIKey() : typedKey,
+                                folderID: typedFolder.isEmpty ? KeychainStore.shared.readYandexFolderID() : typedFolder
+                            )
                             key = ""
+                            folderID = ""
                         }
                         isTesting = true
                         defer { isTesting = false }
                         do {
                             try await appState.aiClient.testConnection()
+                            appState.refreshAliceStatus()
                             status = "Подключено"
                         } catch {
                             status = AIClientError.from(error).localizedDescription
@@ -515,6 +579,9 @@ private struct AIAPISettingsSheet: View {
             PremiumButton(title: "Готово", icon: "checkmark", tint: AppColors.green) {
                 dismiss()
             }
+        }
+        .onAppear {
+            appState.refreshAliceStatus()
         }
     }
 }

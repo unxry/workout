@@ -169,10 +169,8 @@ final class AI_Fitness_CoachTests: XCTestCase {
     }
 
     func testAPIKeyState() {
-        XCTAssertEqual(APIKeyStatus.fromStoredKey(""), .missing)
-        XCTAssertEqual(APIKeyStatus.fromStoredKey("   "), .missing)
-        XCTAssertEqual(APIKeyStatus.fromStoredKey("sk-test"), .configured)
         XCTAssertTrue(APIKeyStatus.configured.isConfigured)
+        XCTAssertFalse(APIKeyStatus.missing.isConfigured)
     }
 
     func testOfflineAIErrorMapping() {
