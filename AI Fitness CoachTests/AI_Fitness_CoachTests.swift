@@ -225,6 +225,7 @@ final class AI_Fitness_CoachTests: XCTestCase {
         XCTAssertTrue(analysis.isFood)
         XCTAssertEqual(analysis.items.first?.productID, "chicken-breast")
         XCTAssertNotNil(analysis.total)
+        XCTAssertEqual(analysis.items.first?.sourceName, "Локальная база")
     }
 
     func testLocalFoodPhotoAnalysisRejectsNonFood() {
@@ -294,6 +295,25 @@ final class AI_Fitness_CoachTests: XCTestCase {
 
         XCTAssertTrue(outcome.usedInternet)
         XCTAssertEqual(outcome.results.filter { $0.product.barcode == "123" }.count, 1)
+    }
+
+    func testComplexDishSearchIsMarkedAsAverageEstimate() async {
+        let remote = StaticProductSearchProvider(results: [
+            ProductSearchResult(
+                product: FoodProduct(id: "caesar", name: "Салат Цезарь с курицей", category: "Интернет", kcalPer100g: 190, proteinPer100g: 9, fatPer100g: 14, carbsPer100g: 8, source: "Test"),
+                source: "Test",
+                hasConfirmedNutrition: true,
+                notice: nil,
+                sourceQuality: .genericEstimate,
+                confidence: 0.56,
+                isAverageEstimate: true
+            )
+        ])
+
+        let outcome = await ProductSearchService(remoteProvider: remote).search(query: "цезарь", localProducts: [], includeInternet: true)
+
+        XCTAssertEqual(outcome.results.first?.isAverageEstimate, true)
+        XCTAssertEqual(outcome.results.first?.sourceQuality, .genericEstimate)
     }
 }
 

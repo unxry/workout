@@ -453,6 +453,7 @@ private struct MealDisplayRow: View {
 }
 
 struct ManualFoodSheet: View {
+    @EnvironmentObject private var store: LocalDataStore
     @Environment(\.dismiss) private var dismiss
     let onSave: (MealDraft) -> Void
     @State private var title = ""
@@ -461,11 +462,41 @@ struct ManualFoodSheet: View {
     @State private var protein = ""
     @State private var fat = ""
     @State private var carbs = ""
+    @State private var lookupResults: [ProductSearchResult] = []
+    @State private var selectedLookup: ProductSearchResult?
+    @State private var lookupMessage: String?
+    @State private var isLookingUp = false
 
     var body: some View {
         FoodFormShell(title: "Добавить вручную") {
             PremiumTextField(placeholder: "Название", text: $title)
             PremiumTextField(placeholder: "Вес порции, г", text: $weight, keyboard: .decimalPad)
+
+            Button {
+                Task { await lookupNutrition() }
+            } label: {
+                Label(isLookingUp ? "Ищу пищевые значения..." : "Найти БЖУ по названию", systemImage: "magnifyingglass")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppColors.purple)
+            .disabled(isLookingUp || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            if let lookupMessage {
+                PremiumCard(padding: 12, radius: 14) {
+                    Text(lookupMessage)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(AppColors.yellow)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            ForEach(lookupResults.prefix(3)) { result in
+                ProductLookupResultCard(result: result) {
+                    selectedLookup = result
+                }
+            }
+
             PremiumTextField(placeholder: "Калории", text: $calories, keyboard: .decimalPad)
             HStack(spacing: 10) {
                 PremiumTextField(placeholder: "Белок", text: $protein, keyboard: .decimalPad)
@@ -479,6 +510,24 @@ struct ManualFoodSheet: View {
             }
             .padding(.top, 8)
         }
+        .sheet(item: $selectedLookup) { result in
+            ProductConfirmationSheet(result: result, initialGrams: max(number(weight), result.product.packageGrams ?? 100)) { product, grams, total in
+                store.upsertFoodProduct(product)
+                store.markFoodProductUsed(product.id)
+                onSave(MealDraft(title: "\(product.name) \(Int(grams)) г", calories: total.calories, protein: total.protein, fat: total.fat, carbs: total.carbs, source: "confirmed:\(result.source)"))
+                dismiss()
+            }
+        }
+    }
+
+    private func lookupNutrition() async {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        isLookingUp = true
+        defer { isLookingUp = false }
+        let outcome = await ProductSearchService().search(query: "\(trimmed) БЖУ на 100 г", localProducts: store.foodProducts, includeInternet: true)
+        lookupResults = outcome.results.filter(\.hasConfirmedNutrition)
+        lookupMessage = outcome.message ?? (lookupResults.isEmpty ? "Не удалось найти надежные пищевые данные. Можно заполнить значения вручную." : "Выбери вариант и подтверди значения перед сохранением.")
     }
 }
 
@@ -498,6 +547,7 @@ struct PhotoFoodSheet: View {
     @State private var protein = ""
     @State private var fat = ""
     @State private var carbs = ""
+    @State private var isLookingUpNutrition = false
 
     var body: some View {
         FoodFormShell(title: "Фото еды") {
@@ -556,7 +606,7 @@ struct PhotoFoodSheet: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(AppColors.purple)
-            .disabled(imageData == nil || isAnalyzing)
+            .disabled(imageData == nil || isAnalyzing || isLookingUpNutrition)
 
             HStack(spacing: 10) {
                 Button {
@@ -591,6 +641,17 @@ struct PhotoFoodSheet: View {
                                 .font(.system(size: 15, weight: .regular))
                                 .foregroundStyle(AppColors.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
+                            ForEach(analysis.items, id: \.name) { item in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("\(item.name) • ~\(Int(item.estimatedGrams)) г")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(.white.opacity(0.88))
+                                    Text(itemSourceText(item))
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle((item.isAverageEstimate ?? false) ? AppColors.yellow : AppColors.secondaryText)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
                             if let total = analysis.total {
                                 Text("~\(Int(total.calories)) ккал • Б \(Int(total.protein)) г • Ж \(Int(total.fat)) г • У \(Int(total.carbs)) г")
                                     .font(.system(size: 16, weight: .semibold))
@@ -650,7 +711,12 @@ struct PhotoFoodSheet: View {
         isAnalyzing = true
         errorMessage = nil
         defer { isAnalyzing = false }
-        let result = await FoodPhotoAnalysisService().analyze(image)
+        var result = await FoodPhotoAnalysisService().analyze(image)
+        if result.isFood {
+            isLookingUpNutrition = true
+            result = await enrichWithInternetNutrition(result)
+            isLookingUpNutrition = false
+        }
         analysis = result
         if result.isFood, let total = result.total {
             title = result.items.map(\.name).joined(separator: ", ")
@@ -660,6 +726,48 @@ struct PhotoFoodSheet: View {
             fat = "\(Int(total.fat))"
             carbs = "\(Int(total.carbs))"
         }
+    }
+
+    private func enrichWithInternetNutrition(_ analysis: FoodPhotoAnalysis) async -> FoodPhotoAnalysis {
+        var enrichedItems: [FoodEstimateItem] = []
+        for item in analysis.items {
+            let outcome = await ProductSearchService().search(query: "\(item.name) БЖУ на 100 г", localProducts: NutritionDatabaseService.defaultProducts, includeInternet: true)
+            guard let match = outcome.results.first(where: \.hasConfirmedNutrition) else {
+                enrichedItems.append(item)
+                continue
+            }
+            let total = NutritionDatabaseService.nutrition(for: match.product, grams: item.estimatedGrams)
+            enrichedItems.append(
+                FoodEstimateItem(
+                    productID: match.product.id,
+                    name: match.product.name,
+                    estimatedGrams: item.estimatedGrams,
+                    confidence: min(item.confidence, match.confidence),
+                    calories: total.calories,
+                    protein: total.protein,
+                    fat: total.fat,
+                    carbs: total.carbs,
+                    sourceName: match.sourceDescription,
+                    sourceURL: match.product.sourceURL,
+                    isAverageEstimate: match.isAverageEstimate
+                )
+            )
+        }
+        let total = NutritionEstimateTotal(
+            calories: enrichedItems.reduce(0) { $0 + $1.calories },
+            protein: enrichedItems.reduce(0) { $0 + $1.protein },
+            fat: enrichedItems.reduce(0) { $0 + $1.fat },
+            carbs: enrichedItems.reduce(0) { $0 + $1.carbs }
+        )
+        return FoodPhotoAnalysis(status: analysis.status, confidence: analysis.confidence, message: analysis.message, items: enrichedItems, total: total)
+    }
+
+    private func itemSourceText(_ item: FoodEstimateItem) -> String {
+        let source = item.sourceName ?? "Локальная база"
+        if item.isAverageEstimate == true {
+            return "Найден средний вариант: \(source). Рецепт может отличаться."
+        }
+        return "Данные на 100 г: \(source)"
     }
 
     private func setSelectedImage(_ uiImage: UIImage) {
@@ -684,6 +792,7 @@ struct SearchFoodSheet: View {
     @State private var results: [ProductSearchResult] = []
     @State private var message: String?
     @State private var isSearching = false
+    @State private var selectedResult: ProductSearchResult?
 
     var body: some View {
         FoodFormShell(title: "Найти продукт") {
@@ -715,6 +824,15 @@ struct SearchFoodSheet: View {
                 productRow(result)
             }
         }
+        .sheet(item: $selectedResult) { result in
+            let initialGrams = max(number(gramsByID[result.product.id] ?? ""), result.product.packageGrams ?? 100)
+            ProductConfirmationSheet(result: result, initialGrams: initialGrams) { product, grams, total in
+                store.upsertFoodProduct(product)
+                store.markFoodProductUsed(product.id)
+                onSave(MealDraft(title: "\(product.name) \(Int(grams)) г", calories: total.calories, protein: total.protein, fat: total.fat, carbs: total.carbs, source: "confirmed:\(result.source)"))
+                dismiss()
+            }
+        }
         .task {
             await search(includeInternet: false)
         }
@@ -742,9 +860,15 @@ struct SearchFoodSheet: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(AppColors.secondaryText)
                         }
-                        Text("Источник: \(result.source)")
+                        Text("Источник: \(result.sourceDescription)")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(AppColors.purple)
+                        if result.isAverageEstimate {
+                            Text("Найден средний вариант. Для салатов и сложных блюд рецепт может сильно отличаться.")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(AppColors.yellow)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     Spacer()
                     Image(systemName: result.hasConfirmedNutrition ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
@@ -760,15 +884,13 @@ struct SearchFoodSheet: View {
                     HStack(spacing: 10) {
                         PremiumTextField(placeholder: "граммы", text: gramsText, keyboard: .decimalPad)
                         Button {
-                            store.upsertFoodProduct(product)
-                            store.markFoodProductUsed(product.id)
-                            onSave(MealDraft(title: "\(product.name) \(Int(grams)) г", calories: total.calories, protein: total.protein, fat: total.fat, carbs: total.carbs, source: "search:\(result.source)"))
-                            dismiss()
+                            selectedResult = result
                         } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 30, weight: .bold))
-                                .foregroundStyle(AppColors.green)
-                                .frame(width: 52, height: 52)
+                            Text("Выбрать")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 96, height: 52)
+                                .background(Capsule().fill(AppColors.green.opacity(0.78)))
                         }
                         .buttonStyle(.plain)
                         .disabled(grams <= 0)
@@ -798,6 +920,198 @@ struct SearchFoodSheet: View {
 
     private func format(_ value: Double) -> String {
         value.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(value))" : String(format: "%.1f", value)
+    }
+}
+
+private struct ProductLookupResultCard: View {
+    let result: ProductSearchResult
+    let action: () -> Void
+
+    var body: some View {
+        PremiumCard(padding: 14, radius: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(result.product.name)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let brand = result.product.brand, !brand.isEmpty {
+                            Text(brand)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(AppColors.secondaryText)
+                        }
+                        Text(result.sourceDescription)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(AppColors.purple)
+                    }
+                    Spacer()
+                    Image(systemName: result.hasConfirmedNutrition ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(result.hasConfirmedNutrition ? AppColors.green : AppColors.yellow)
+                }
+
+                if result.hasConfirmedNutrition {
+                    Text("\(Int(result.product.kcalPer100g)) ккал / 100 г • Б \(format(result.product.proteinPer100g)) • Ж \(format(result.product.fatPer100g)) • У \(format(result.product.carbsPer100g))")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(AppColors.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if result.isAverageEstimate {
+                        Text("Найден средний вариант. Подтверди рецепт и граммовку перед добавлением.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(AppColors.yellow)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Button {
+                        action()
+                    } label: {
+                        Text("Выбрать и проверить")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Capsule().fill(AppColors.purple.opacity(0.74)))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text(result.notice ?? "БЖУ не указаны источником.")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(AppColors.yellow)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private func format(_ value: Double) -> String {
+        value.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(value))" : String(format: "%.1f", value)
+    }
+}
+
+private struct ProductConfirmationSheet: View {
+    let result: ProductSearchResult
+    let onConfirm: (FoodProduct, Double, NutritionEstimateTotal) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var grams: String
+    @State private var kcal100: String
+    @State private var protein100: String
+    @State private var fat100: String
+    @State private var carbs100: String
+
+    init(result: ProductSearchResult, initialGrams: Double, onConfirm: @escaping (FoodProduct, Double, NutritionEstimateTotal) -> Void) {
+        self.result = result
+        self.onConfirm = onConfirm
+        _name = State(initialValue: result.product.name)
+        _grams = State(initialValue: String(Int(initialGrams.rounded())))
+        _kcal100 = State(initialValue: Self.format(result.product.kcalPer100g))
+        _protein100 = State(initialValue: Self.format(result.product.proteinPer100g))
+        _fat100 = State(initialValue: Self.format(result.product.fatPer100g))
+        _carbs100 = State(initialValue: Self.format(result.product.carbsPer100g))
+    }
+
+    private var portionGrams: Double { max(number(grams), 0) }
+    private var editedProduct: FoodProduct {
+        var product = result.product
+        product.name = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? result.product.name : name.trimmingCharacters(in: .whitespacesAndNewlines)
+        product.kcalPer100g = max(number(kcal100), 0)
+        product.proteinPer100g = max(number(protein100), 0)
+        product.fatPer100g = max(number(fat100), 0)
+        product.carbsPer100g = max(number(carbs100), 0)
+        product.lastUsedAt = .now
+        return product
+    }
+    private var total: NutritionEstimateTotal {
+        NutritionDatabaseService.nutrition(for: editedProduct, grams: portionGrams)
+    }
+
+    var body: some View {
+        ZStack {
+            PremiumBackground()
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Text("Проверить продукт")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .background(Circle().fill(Color.white.opacity(0.10)))
+                        }
+                    }
+
+                    PremiumCard(padding: 16, radius: 18) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(result.isAverageEstimate ? "Найден средний вариант" : "Найдены пищевые значения")
+                                .font(.system(size: 19, weight: .semibold))
+                                .foregroundStyle(result.isAverageEstimate ? AppColors.yellow : AppColors.green)
+                            Text("Источник: \(result.sourceDescription)")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(AppColors.secondaryText)
+                            if let url = result.product.sourceURL {
+                                Text(url.absoluteString)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(AppColors.mutedText)
+                                    .lineLimit(2)
+                            }
+                            Text("Интернет помогает найти значения, но не заменяет подтверждение. Для салатов и сложных блюд проверь рецепт, граммовку и БЖУ.")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(AppColors.yellow)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    PremiumTextField(placeholder: "Название", text: $name)
+                    PremiumTextField(placeholder: "Порция, г", text: $grams, keyboard: .decimalPad)
+
+                    PremiumCard(padding: 14, radius: 16) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("На 100 г")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.white)
+                            PremiumTextField(placeholder: "Ккал / 100 г", text: $kcal100, keyboard: .decimalPad)
+                            HStack(spacing: 10) {
+                                PremiumTextField(placeholder: "Б", text: $protein100, keyboard: .decimalPad)
+                                PremiumTextField(placeholder: "Ж", text: $fat100, keyboard: .decimalPad)
+                                PremiumTextField(placeholder: "У", text: $carbs100, keyboard: .decimalPad)
+                            }
+                        }
+                    }
+
+                    PremiumCard(padding: 16, radius: 18) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("На вашу порцию")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Text("~\(Int(total.calories.rounded())) ккал • Б \(format(total.protein)) г • Ж \(format(total.fat)) г • У \(format(total.carbs)) г")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(.white)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    PremiumButton(title: "Подтвердить и добавить", icon: "checkmark", tint: AppColors.green) {
+                        guard portionGrams > 0 else { return }
+                        onConfirm(editedProduct, portionGrams, total)
+                        dismiss()
+                    }
+                }
+                .padding(22)
+                .padding(.bottom, 24)
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private static func format(_ value: Double) -> String {
+        value.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(value))" : String(format: "%.1f", value)
+    }
+
+    private func format(_ value: Double) -> String {
+        Self.format(value)
     }
 }
 

@@ -199,7 +199,10 @@ final class FoodPhotoAnalysisService {
                 calories: total.calories,
                 protein: total.protein,
                 fat: total.fat,
-                carbs: total.carbs
+                carbs: total.carbs,
+                sourceName: product.source,
+                sourceURL: product.sourceURL,
+                isAverageEstimate: ProductSearchService.isAverageEstimate(product)
             )
         }
 

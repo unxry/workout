@@ -340,6 +340,9 @@ struct FoodEstimateItem: Codable, Equatable {
     var protein: Double
     var fat: Double
     var carbs: Double
+    var sourceName: String?
+    var sourceURL: URL?
+    var isAverageEstimate: Bool?
 
     enum CodingKeys: String, CodingKey {
         case productID = "product_id"
@@ -350,6 +353,9 @@ struct FoodEstimateItem: Codable, Equatable {
         case protein
         case fat
         case carbs
+        case sourceName = "source_name"
+        case sourceURL = "source_url"
+        case isAverageEstimate = "is_average_estimate"
     }
 }
 

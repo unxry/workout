@@ -6,6 +6,41 @@ struct ProductSearchResult: Identifiable, Equatable {
     var source: String
     var hasConfirmedNutrition: Bool
     var notice: String?
+    var sourceQuality: NutritionSourceQuality = .nutritionDatabase
+    var confidence: Double = 0.72
+    var isAverageEstimate: Bool = false
+
+    var sourceDescription: String {
+        "\(source) • \(sourceQuality.title)"
+    }
+}
+
+enum NutritionSourceQuality: String, Equatable, CaseIterable {
+    case officialManufacturer
+    case officialProductCard
+    case nutritionDatabase
+    case foodDirectory
+    case genericEstimate
+
+    var title: String {
+        switch self {
+        case .officialManufacturer: "производитель"
+        case .officialProductCard: "карточка товара"
+        case .nutritionDatabase: "база питания"
+        case .foodDirectory: "каталог питания"
+        case .genericEstimate: "средний вариант"
+        }
+    }
+
+    var rank: Int {
+        switch self {
+        case .officialManufacturer: 5
+        case .officialProductCard: 4
+        case .nutritionDatabase: 3
+        case .foodDirectory: 2
+        case .genericEstimate: 1
+        }
+    }
 }
 
 protocol ProductSearchProvider {
@@ -20,7 +55,17 @@ struct LocalProductSearchProvider: ProductSearchProvider {
     func search(query: String) async throws -> [ProductSearchResult] {
         NutritionDatabaseService(products: products)
             .search(query)
-            .map { ProductSearchResult(product: $0, source: $0.source, hasConfirmedNutrition: true, notice: nil) }
+            .map {
+                ProductSearchResult(
+                    product: $0,
+                    source: $0.source,
+                    hasConfirmedNutrition: true,
+                    notice: ProductSearchService.isAverageEstimate($0) ? "Использована средняя оценка. Проверь граммовку и состав перед сохранением." : nil,
+                    sourceQuality: ProductSearchService.isAverageEstimate($0) ? .genericEstimate : .nutritionDatabase,
+                    confidence: ProductSearchService.isAverageEstimate($0) ? 0.58 : 0.78,
+                    isAverageEstimate: ProductSearchService.isAverageEstimate($0)
+                )
+            }
     }
 }
 
@@ -85,6 +130,7 @@ struct OpenFoodFactsSearchProvider: ProductSearchProvider {
             return ProductSearchResult(product: product, source: self.name, hasConfirmedNutrition: false, notice: "БЖУ не указаны источником.")
         }
 
+        let average = ProductSearchService.isAverageEstimate(name: name)
         let product = FoodProduct(
             id: "off-\(item.code ?? UUID().uuidString)",
             name: name,
@@ -100,7 +146,15 @@ struct OpenFoodFactsSearchProvider: ProductSearchProvider {
             source: self.name,
             sourceURL: item.url
         )
-        return ProductSearchResult(product: product, source: self.name, hasConfirmedNutrition: true, notice: nil)
+        return ProductSearchResult(
+            product: product,
+            source: self.name,
+            hasConfirmedNutrition: true,
+            notice: average ? "Найден средний вариант. Рецепт может отличаться, проверь граммовку и БЖУ." : nil,
+            sourceQuality: .nutritionDatabase,
+            confidence: item.code == nil ? 0.72 : 0.88,
+            isAverageEstimate: average
+        )
     }
 
     private func grams(from quantity: String?) -> Double? {
@@ -161,13 +215,37 @@ final class ProductSearchService {
     }
 
     private func merge(_ results: [ProductSearchResult]) -> [ProductSearchResult] {
-        var seen: Set<String> = []
-        return results.filter { result in
+        var bestByKey: [String: ProductSearchResult] = [:]
+        for result in results {
             let key = result.product.barcode ?? result.product.name.lowercased()
-            guard !seen.contains(key) else { return false }
-            seen.insert(key)
-            return true
+            if let current = bestByKey[key] {
+                bestByKey[key] = better(current, result)
+            } else {
+                bestByKey[key] = result
+            }
         }
+        return bestByKey.values.sorted {
+            if $0.sourceQuality.rank != $1.sourceQuality.rank {
+                return $0.sourceQuality.rank > $1.sourceQuality.rank
+            }
+            return $0.confidence > $1.confidence
+        }
+    }
+
+    private func better(_ lhs: ProductSearchResult, _ rhs: ProductSearchResult) -> ProductSearchResult {
+        if lhs.sourceQuality.rank != rhs.sourceQuality.rank {
+            return lhs.sourceQuality.rank > rhs.sourceQuality.rank ? lhs : rhs
+        }
+        return lhs.confidence >= rhs.confidence ? lhs : rhs
+    }
+
+    static func isAverageEstimate(_ product: FoodProduct) -> Bool {
+        isAverageEstimate(name: product.name) || product.category.localizedCaseInsensitiveContains("Овощи") && product.name.localizedCaseInsensitiveContains("Овощи")
+    }
+
+    static func isAverageEstimate(name: String) -> Bool {
+        let normalized = name.lowercased().replacingOccurrences(of: "ё", with: "е")
+        return ["салат", "оливье", "цезарь", "шаурма", "пицца", "суп", "рагу", "паста", "боул", "овощи"].contains { normalized.contains($0) }
     }
 }
 
