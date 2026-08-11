@@ -121,6 +121,90 @@ final class AI_Fitness_CoachTests: XCTestCase {
         XCTAssertGreaterThan(targets.waterLiters, 2)
     }
 
+    func testAggressiveGoalDateUsesSafetyFloorAndRecommendedDate() {
+        let desiredDate = Calendar.current.date(byAdding: .day, value: 28, to: .now)!
+        let profile = UserProfile(
+            name: "Test",
+            birthDate: Calendar.current.date(byAdding: .year, value: -30, to: .now)!,
+            sex: .male,
+            heightCm: 182,
+            currentWeightKg: 100,
+            targetWeightKg: 80,
+            goalStartWeightKg: 100,
+            desiredGoalDate: desiredDate,
+            goal: .fatLoss,
+            activityLevel: 1.45,
+            trainingDaysPerWeek: 4,
+            preferredMealsPerDay: 4,
+            sleepTime: .now,
+            wakeTime: .now,
+            allergies: "",
+            excludedFoods: ""
+        )
+
+        let targets = NutritionCalculator.targets(for: profile)
+
+        XCTAssertTrue(targets.isDateTooAggressive)
+        XCTAssertGreaterThanOrEqual(targets.calories, targets.calorieFloor)
+        XCTAssertGreaterThan(targets.recommendedGoalDate, desiredDate)
+    }
+
+    func testGoalProgressUsesStartCurrentAndTargetWeight() {
+        let lossProfile = UserProfile(
+            name: "Loss",
+            birthDate: Calendar.current.date(byAdding: .year, value: -30, to: .now)!,
+            sex: .male,
+            heightCm: 180,
+            currentWeightKg: 90,
+            targetWeightKg: 80,
+            goalStartWeightKg: 100,
+            goal: .fatLoss,
+            activityLevel: 1.4,
+            trainingDaysPerWeek: 3,
+            preferredMealsPerDay: 3,
+            sleepTime: .now,
+            wakeTime: .now,
+            allergies: "",
+            excludedFoods: ""
+        )
+
+        let gainProfile = UserProfile(
+            name: "Gain",
+            birthDate: Calendar.current.date(byAdding: .year, value: -30, to: .now)!,
+            sex: .male,
+            heightCm: 180,
+            currentWeightKg: 75,
+            targetWeightKg: 80,
+            goalStartWeightKg: 70,
+            goal: .muscleGain,
+            activityLevel: 1.4,
+            trainingDaysPerWeek: 3,
+            preferredMealsPerDay: 3,
+            sleepTime: .now,
+            wakeTime: .now,
+            allergies: "",
+            excludedFoods: ""
+        )
+
+        XCTAssertEqual(NutritionCalculator.goalProgress(for: lossProfile), 0.5, accuracy: 0.001)
+        XCTAssertEqual(NutritionCalculator.goalProgress(for: gainProfile), 0.5, accuracy: 0.001)
+    }
+
+    func testDailyNutritionBreakdownFindsTopContributors() {
+        let meals = [
+            MealEntry(title: "Рис", calories: 260, protein: 5, fat: 1, carbs: 50),
+            MealEntry(title: "Банан", calories: 110, protein: 1, fat: 0, carbs: 25),
+            MealEntry(title: "Курица", calories: 220, protein: 45, fat: 5, carbs: 0)
+        ]
+
+        let breakdown = DailyNutritionBreakdownService.breakdown(for: meals)
+
+        XCTAssertEqual(Int(breakdown.totals.carbs), 75)
+        XCTAssertEqual(breakdown.topContributors(for: .carbs).first?.title, "Рис")
+        XCTAssertEqual(breakdown.topContributors(for: .protein).first?.title, "Курица")
+        XCTAssertEqual(breakdown.topContributors(for: .calories).first?.title, "Рис")
+    }
+
     func testNutritionLookupAndGramsCalculation() {
         let database = NutritionDatabaseService()
         let product = database.product(id: "chicken-breast")!

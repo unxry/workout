@@ -25,6 +25,8 @@ final class UserProfile: Identifiable, Codable {
     var heightCm: Double
     var currentWeightKg: Double
     var targetWeightKg: Double
+    var goalStartWeightKg: Double
+    var desiredGoalDate: Date?
     var goalRawValue: String
     var activityLevel: Double
     var trainingDaysPerWeek: Int
@@ -44,6 +46,8 @@ final class UserProfile: Identifiable, Codable {
         heightCm: Double,
         currentWeightKg: Double,
         targetWeightKg: Double,
+        goalStartWeightKg: Double? = nil,
+        desiredGoalDate: Date? = nil,
         goal: FitnessGoal,
         activityLevel: Double,
         trainingDaysPerWeek: Int,
@@ -60,6 +64,8 @@ final class UserProfile: Identifiable, Codable {
         self.heightCm = heightCm
         self.currentWeightKg = currentWeightKg
         self.targetWeightKg = targetWeightKg
+        self.goalStartWeightKg = goalStartWeightKg ?? currentWeightKg
+        self.desiredGoalDate = desiredGoalDate
         self.goalRawValue = goal.rawValue
         self.activityLevel = activityLevel
         self.trainingDaysPerWeek = trainingDaysPerWeek
@@ -82,6 +88,74 @@ final class UserProfile: Identifiable, Codable {
 
     var age: Int {
         Calendar.current.dateComponents([.year], from: birthDate, to: .now).year ?? 30
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case birthDate
+        case sexRawValue
+        case heightCm
+        case currentWeightKg
+        case targetWeightKg
+        case goalStartWeightKg
+        case desiredGoalDate
+        case goalRawValue
+        case activityLevel
+        case trainingDaysPerWeek
+        case preferredMealsPerDay
+        case sleepTime
+        case wakeTime
+        case allergies
+        case excludedFoods
+        case createdAt
+        case updatedAt
+    }
+
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Ты"
+        birthDate = try container.decodeIfPresent(Date.self, forKey: .birthDate) ?? Calendar.current.date(byAdding: .year, value: -30, to: .now) ?? .now
+        sexRawValue = try container.decodeIfPresent(String.self, forKey: .sexRawValue) ?? BiologicalSex.notSpecified.rawValue
+        heightCm = try container.decodeIfPresent(Double.self, forKey: .heightCm) ?? 175
+        currentWeightKg = try container.decodeIfPresent(Double.self, forKey: .currentWeightKg) ?? 75
+        targetWeightKg = try container.decodeIfPresent(Double.self, forKey: .targetWeightKg) ?? currentWeightKg
+        goalStartWeightKg = try container.decodeIfPresent(Double.self, forKey: .goalStartWeightKg) ?? currentWeightKg
+        desiredGoalDate = try container.decodeIfPresent(Date.self, forKey: .desiredGoalDate)
+        goalRawValue = try container.decodeIfPresent(String.self, forKey: .goalRawValue) ?? FitnessGoal.maintenance.rawValue
+        activityLevel = try container.decodeIfPresent(Double.self, forKey: .activityLevel) ?? 1.45
+        trainingDaysPerWeek = try container.decodeIfPresent(Int.self, forKey: .trainingDaysPerWeek) ?? 3
+        preferredMealsPerDay = try container.decodeIfPresent(Int.self, forKey: .preferredMealsPerDay) ?? 3
+        sleepTime = try container.decodeIfPresent(Date.self, forKey: .sleepTime) ?? .now
+        wakeTime = try container.decodeIfPresent(Date.self, forKey: .wakeTime) ?? .now
+        allergies = try container.decodeIfPresent(String.self, forKey: .allergies) ?? ""
+        excludedFoods = try container.decodeIfPresent(String.self, forKey: .excludedFoods) ?? ""
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? .now
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? .now
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(birthDate, forKey: .birthDate)
+        try container.encode(sexRawValue, forKey: .sexRawValue)
+        try container.encode(heightCm, forKey: .heightCm)
+        try container.encode(currentWeightKg, forKey: .currentWeightKg)
+        try container.encode(targetWeightKg, forKey: .targetWeightKg)
+        try container.encode(goalStartWeightKg, forKey: .goalStartWeightKg)
+        try container.encodeIfPresent(desiredGoalDate, forKey: .desiredGoalDate)
+        try container.encode(goalRawValue, forKey: .goalRawValue)
+        try container.encode(activityLevel, forKey: .activityLevel)
+        try container.encode(trainingDaysPerWeek, forKey: .trainingDaysPerWeek)
+        try container.encode(preferredMealsPerDay, forKey: .preferredMealsPerDay)
+        try container.encode(sleepTime, forKey: .sleepTime)
+        try container.encode(wakeTime, forKey: .wakeTime)
+        try container.encode(allergies, forKey: .allergies)
+        try container.encode(excludedFoods, forKey: .excludedFoods)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
     }
 }
 

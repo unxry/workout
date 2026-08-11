@@ -9,6 +9,7 @@ struct DashboardView: View {
 
     @State private var showReminders = false
     @State private var activePlanDetail: PlanDetail?
+    @State private var activeNutritionMetric: NutritionMetricKind?
     @State private var day = DayContext()
     @State private var lastRefresh = Date.now
     @State private var healthStatus = "Данные Apple Health еще не синхронизированы."
@@ -30,6 +31,13 @@ struct DashboardView: View {
             .padding(.top, 18)
             .padding(.bottom, 144)
         }
+        .sheet(item: $activeNutritionMetric) { metric in
+            NutritionMetricDetailSheet(
+                metric: metric,
+                breakdown: nutritionBreakdown,
+                targets: targets
+            )
+        }
         .sheet(item: $activePlanDetail) { detail in
             PlanDetailSheet(
                 detail: detail,
@@ -41,7 +49,8 @@ struct DashboardView: View {
                 hourlySteps: hourlySteps,
                 healthStatus: healthStatus,
                 currentWeight: currentWeight,
-                targetWeight: targetWeight
+                targetWeight: targetWeight,
+                goalProgress: goalProgress
             ) {
                 Task { await syncHealthMetrics(requestAuthorization: true) }
             }
@@ -87,12 +96,11 @@ struct DashboardView: View {
     }
 
     private var totals: MacroTotals {
-        return MacroTotals(
-            calories: todayMeals.reduce(0) { $0 + $1.calories },
-            protein: todayMeals.reduce(0) { $0 + $1.protein },
-            fat: todayMeals.reduce(0) { $0 + $1.fat },
-            carbs: todayMeals.reduce(0) { $0 + $1.carbs }
-        )
+        nutritionBreakdown.totals
+    }
+
+    private var nutritionBreakdown: DailyNutritionBreakdown {
+        DailyNutritionBreakdownService.breakdown(for: todayMeals)
     }
 
     private var header: some View {
@@ -114,11 +122,22 @@ struct DashboardView: View {
 
     private var summaryGrid: some View {
         LazyVGrid(columns: [.init(.flexible(), spacing: 14), .init(.flexible(), spacing: 14)], spacing: 14) {
-            MetricCard(title: "Калории", value: "\(Int(totals.calories))", target: "\(Int(targets.calories)) ккал", progress: totals.calories / targets.calories, tint: AppColors.green)
-            MetricCard(title: "Белок", value: String(format: "%.1f", totals.protein), target: "\(Int(targets.protein)) г", progress: totals.protein / targets.protein, tint: AppColors.purple)
-            MetricCard(title: "Жиры", value: String(format: "%.1f", totals.fat), target: "\(Int(targets.fat)) г", progress: totals.fat / targets.fat, tint: AppColors.purple)
-            MetricCard(title: "Углеводы", value: String(format: "%.1f", totals.carbs), target: "\(Int(targets.carbs)) г", progress: totals.carbs / targets.carbs, tint: AppColors.yellow)
+            summaryMetric(.calories, value: "\(Int(totals.calories))", target: "\(Int(targets.calories)) ккал", progress: totals.calories / targets.calories, tint: AppColors.green)
+            summaryMetric(.protein, value: String(format: "%.1f", totals.protein), target: "\(Int(targets.protein)) г", progress: totals.protein / targets.protein, tint: AppColors.purple)
+            summaryMetric(.fat, value: String(format: "%.1f", totals.fat), target: "\(Int(targets.fat)) г", progress: totals.fat / targets.fat, tint: AppColors.purple)
+            summaryMetric(.carbs, value: String(format: "%.1f", totals.carbs), target: "\(Int(targets.carbs)) г", progress: totals.carbs / targets.carbs, tint: AppColors.yellow)
         }
+    }
+
+    private func summaryMetric(_ metric: NutritionMetricKind, value: String, target: String, progress: Double, tint: Color) -> some View {
+        Button {
+            Haptics.tap()
+            activeNutritionMetric = metric
+        } label: {
+            MetricCard(title: metric.title, value: value, target: target, progress: progress, tint: tint)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("dashboard.metric.\(metric.rawValue)")
     }
 
     private var weightTrendSection: some View {
@@ -204,7 +223,7 @@ struct DashboardView: View {
                 DashboardPlanRow(icon: "drop.fill", title: "Вода", value: "\(String(format: "%.1f", todayMetric?.waterLiters ?? 0)) / \(String(format: "%.1f", targets.waterLiters)) л", percent: Int((((todayMetric?.waterLiters ?? 0) / targets.waterLiters) * 100).rounded()), progress: (todayMetric?.waterLiters ?? 0) / targets.waterLiters, tint: AppColors.blue) {
                     activePlanDetail = .water
                 }
-                DashboardPlanRow(icon: "scalemass", title: "Вес", value: "\(String(format: "%.1f", currentWeight)) / \(String(format: "%.1f", targetWeight)) кг", percent: Int(NutritionCalculator.progress(current: currentWeight, target: targetWeight) * 100), progress: NutritionCalculator.progress(current: currentWeight, target: targetWeight), tint: AppColors.purple) {
+                DashboardPlanRow(icon: "scalemass", title: "Вес", value: "\(String(format: "%.1f", currentWeight)) / \(String(format: "%.1f", targetWeight)) кг", percent: Int((goalProgress * 100).rounded()), progress: goalProgress, tint: AppColors.purple) {
                     activePlanDetail = .weight
                 }
             }
@@ -232,6 +251,10 @@ struct DashboardView: View {
 
     private var currentWeight: Double { profile?.currentWeightKg ?? 62.0 }
     private var targetWeight: Double { profile?.targetWeightKg ?? 67.0 }
+    private var goalProgress: Double {
+        guard let profile else { return 0 }
+        return NutritionCalculator.goalProgress(for: profile)
+    }
 
     private var weightPoints: [WeightVisualPoint] {
         if store.metrics.count >= 3 {
@@ -291,7 +314,7 @@ struct DashboardView: View {
     }
 }
 
-struct MacroTotals {
+struct MacroTotals: Equatable {
     let calories: Double
     let protein: Double
     let fat: Double
@@ -411,6 +434,190 @@ private enum PlanDetail: String, Identifiable {
     }
 }
 
+private struct NutritionMetricDetailSheet: View {
+    let metric: NutritionMetricKind
+    let breakdown: DailyNutritionBreakdown
+    let targets: NutritionTargets
+    @Environment(\.dismiss) private var dismiss
+
+    private var current: Double { breakdown.totals.value(for: metric) }
+    private var target: Double { targets.value(for: metric) }
+    private var left: Double { max(target - current, 0) }
+    private var tint: Color {
+        switch metric {
+        case .calories: AppColors.green
+        case .protein, .fat: AppColors.purple
+        case .carbs: AppColors.yellow
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            PremiumBackground()
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Text(metric.title)
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .background(Circle().fill(Color.white.opacity(0.10)))
+                        }
+                    }
+
+                    PremiumCard(padding: 18, radius: 20) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Сегодня")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(AppColors.secondaryText)
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(format(current))
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("/ \(format(target)) \(metric.unit)")
+                                    .font(.system(size: 17, weight: .medium))
+                                    .foregroundStyle(AppColors.secondaryText)
+                            }
+                            GradientProgressBar(progress: current / max(target, 1), tint: tint, height: 7)
+                            Text(left > 0 ? "Осталось: \(format(left)) \(metric.unit)" : "Цель закрыта на \(Int((current / max(target, 1) * 100).rounded()))%")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(left > 0 ? AppColors.secondaryText : AppColors.green)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    PremiumCard(padding: 16, radius: 20) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(topTitle)
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.white)
+                            let contributors = breakdown.topContributors(for: metric, limit: 6)
+                            if contributors.isEmpty {
+                                Text("Сегодня еще нет записанных приемов пищи.")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(AppColors.secondaryText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            } else {
+                                ForEach(Array(contributors.enumerated()), id: \.element.id) { index, item in
+                                    contributionRow(index: index + 1, item: item)
+                                }
+                            }
+                        }
+                    }
+
+                    if metric == .protein, left >= 15 {
+                        proteinRecommendation
+                    }
+
+                    if metric == .fat, current > target {
+                        neutralFatInsight
+                    }
+                }
+                .padding(22)
+                .padding(.bottom, 28)
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var topTitle: String {
+        switch metric {
+        case .calories: "Что дало больше всего калорий"
+        case .protein: "Топ источников белка"
+        case .fat: "Что дало больше всего жиров"
+        case .carbs: "Что дало больше всего углеводов"
+        }
+    }
+
+    private var proteinRecommendation: some View {
+        PremiumCard(padding: 16, radius: 20) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Как добрать белок")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("До цели осталось \(format(left)) г белка.")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(AppColors.secondaryText)
+                ForEach(proteinOptions, id: \.self) { option in
+                    Text(option)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.88))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private var neutralFatInsight: some View {
+        let contributors = breakdown.topContributors(for: .fat, limit: 2).map(\.title).joined(separator: " и ")
+        return PremiumCard(padding: 16, radius: 20) {
+            Text(contributors.isEmpty ? "Сегодня жиры выше нормы. Посмотри источники выше и завтра вернись к обычному плану." : "Сегодня больше всего жиров пришло из \(contributors). Это не повод компенсировать тренировкой - просто продолжай обычный план.")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(AppColors.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var proteinOptions: [String] {
+        NutritionDatabaseService.defaultProducts
+            .filter { $0.proteinPer100g >= 10 && $0.kcalPer100g > 0 }
+            .sorted { $0.proteinPer100g > $1.proteinPer100g }
+            .prefix(4)
+            .map { product in
+                let grams = min(max((left / product.proteinPer100g) * 100, 80), 220)
+                return "\(Int(grams.rounded())) г \(product.name) - примерно \(Int((product.proteinPer100g * grams / 100).rounded())) г белка"
+            }
+    }
+
+    private func contributionRow(index: Int, item: NutritionContribution) -> some View {
+        let value = item.value(for: metric)
+        let share = target > 0 ? value / max(current, 1) : 0
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("\(index).")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(tint)
+                    .frame(width: 24, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(timeString(item.date)) • \(Int((share * 100).rounded()))% от сегодняшнего итога")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(AppColors.secondaryText)
+                }
+                Spacer(minLength: 10)
+                Text("\(format(value)) \(metric.unit)")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .multilineTextAlignment(.trailing)
+            }
+            GradientProgressBar(progress: share, tint: tint, height: 4)
+                .padding(.leading, 34)
+        }
+    }
+
+    private func format(_ value: Double) -> String {
+        metric == .calories ? "\(Int(value.rounded()))" : String(format: "%.1f", value)
+    }
+
+    private func timeString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+}
+
 private struct PlanDetailSheet: View {
     let detail: PlanDetail
     let totals: MacroTotals
@@ -422,6 +629,7 @@ private struct PlanDetailSheet: View {
     let healthStatus: String
     let currentWeight: Double
     let targetWeight: Double
+    let goalProgress: Double
     let onSyncHealth: () -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -522,7 +730,7 @@ private struct PlanDetailSheet: View {
         detailSection(title: "Вес", icon: "scalemass", tint: AppColors.purple) {
             detailLine("Текущий вес", "\(String(format: "%.1f", currentWeight)) кг")
             detailLine("Цель", "\(String(format: "%.1f", targetWeight)) кг")
-            detailLine("Прогресс", "\(Int(NutritionCalculator.progress(current: currentWeight, target: targetWeight) * 100))%")
+            detailLine("Прогресс", "\(Int((goalProgress * 100).rounded()))%")
             if let metric {
                 detailLine("Последняя запись", "\(timeString(metric.date)) • \(String(format: "%.1f", metric.weightKg)) кг")
             }

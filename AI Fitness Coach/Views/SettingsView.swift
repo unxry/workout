@@ -41,6 +41,8 @@ struct SettingsView: View {
                         profile.goalRawValue = updated.goalRawValue
                         profile.currentWeightKg = updated.currentWeightKg
                         profile.targetWeightKg = updated.targetWeightKg
+                        profile.goalStartWeightKg = updated.goalStartWeightKg
+                        profile.desiredGoalDate = updated.desiredGoalDate
                         profile.activityLevel = updated.activityLevel
                     }
                 }
@@ -77,72 +79,41 @@ struct SettingsView: View {
     }
 
     private var progress: Double {
-        let start = max(profile.currentWeightKg + 8, profile.currentWeightKg)
-        let total = abs(start - profile.targetWeightKg)
-        guard total > 0 else { return 0.45 }
-        return min(max(abs(start - profile.currentWeightKg) / total, 0.0), 1.0)
+        NutritionCalculator.goalProgress(for: profile)
+    }
+
+    private var targets: NutritionTargets {
+        NutritionCalculator.targets(for: profile)
     }
 
     private var profileCard: some View {
         PremiumCard(padding: 20, radius: 22) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 14) {
-                    profileAvatar(size: 104)
                     profileTextBlock
-                        .frame(minWidth: 165, maxWidth: .infinity, alignment: .leading)
+                        .frame(minWidth: 210, maxWidth: .infinity, alignment: .leading)
                         .layoutPriority(1)
                     Spacer(minLength: 8)
                     profileProgressCircle(size: 88)
                 }
 
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .top, spacing: 14) {
-                        profileAvatar(size: 92)
-                        profileTextBlock
-                            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                            .layoutPriority(1)
-                    }
+                    profileTextBlock
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     HStack(spacing: 14) {
                         profileProgressCircle(size: 76)
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Цель выполнена на 45%")
+                            Text("Цель выполнена на \(Int((progress * 100).rounded()))%")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.white)
                                 .fixedSize(horizontal: false, vertical: true)
-                            GradientProgressBar(progress: 0.45, tint: AppColors.purple, height: 5)
+                            GradientProgressBar(progress: progress, tint: AppColors.purple, height: 5)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
         }
-    }
-
-    private func profileAvatar(size: CGFloat) -> some View {
-        ZStack(alignment: .bottomTrailing) {
-            Circle()
-                .fill(
-                    LinearGradient(colors: [Color.white.opacity(0.18), AppColors.purple.opacity(0.28)], startPoint: .top, endPoint: .bottom)
-                )
-                .overlay(Circle().stroke(AppColors.purple, lineWidth: 3))
-                .frame(width: size, height: size)
-            Image(systemName: "person.fill")
-                .font(.system(size: size * 0.52, weight: .regular))
-                .foregroundStyle(.white.opacity(0.82))
-                .frame(width: size - 10, height: size - 10)
-                .background(Circle().fill(Color.black.opacity(0.28)))
-            Button {
-                statusMessage = "Выбор фото профиля будет открыт на iPhone."
-            } label: {
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(AppColors.purple)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(AppColors.panelDeep).overlay(Circle().stroke(AppColors.purple, lineWidth: 2)))
-            }
-        }
-        .frame(width: size, height: size)
-        .fixedSize()
     }
 
     private var profileTextBlock: some View {
@@ -192,7 +163,7 @@ struct SettingsView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.84)
 
-            Text("Прогресс: -4.6 кг")
+            Text("Осталось: \(String(format: "%.1f", NutritionCalculator.remainingWeight(for: profile))) кг")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(AppColors.green)
                 .lineLimit(1)
@@ -201,9 +172,9 @@ struct SettingsView: View {
     }
 
     private func profileProgressCircle(size: CGFloat) -> some View {
-        CircularProgress(progress: 0.45, tint: AppColors.purple, lineWidth: size > 80 ? 8 : 7, size: size) {
+        CircularProgress(progress: progress, tint: AppColors.purple, lineWidth: size > 80 ? 8 : 7, size: size) {
             VStack(spacing: 2) {
-                Text("45%")
+                Text("\(Int((progress * 100).rounded()))%")
                     .font(.system(size: size > 80 ? 22 : 18, weight: .bold))
                     .foregroundStyle(AppColors.purple)
                     .lineLimit(1)
@@ -236,28 +207,36 @@ struct SettingsView: View {
                             Text(profile.goal.rawValue)
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.white)
-                            Text("Умеренный дефицит")
+                            Text(targets.isDateTooAggressive ? "Безопасный темп вместо слишком ранней даты" : "Рекомендованный темп")
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(AppColors.secondaryText)
                         }
                         Spacer()
-                        Text("45%")
+                        Text("\(Int((progress * 100).rounded()))%")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(AppColors.green)
                     }
-                    GradientProgressBar(progress: 0.45, tint: AppColors.green, height: 8)
+                    GradientProgressBar(progress: progress, tint: AppColors.green, height: 8)
                     HStack {
                         Text("Осталось: ")
                             .foregroundColor(AppColors.secondaryText)
-                        + Text("\(String(format: "%.1f", abs(profile.currentWeightKg - profile.targetWeightKg))) кг")
+                        + Text("\(String(format: "%.1f", NutritionCalculator.remainingWeight(for: profile))) кг")
                             .foregroundColor(.white)
                         Spacer()
                         Text("Ориентировочная дата: ")
                             .foregroundColor(AppColors.secondaryText)
-                        + Text("15 нояб. 2026")
+                        + Text(targets.goalDate.formatted(date: .abbreviated, time: .omitted))
                             .foregroundColor(AppColors.purple)
                     }
                     .font(.system(size: 16, weight: .medium))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                    if let message = targets.safetyMessage {
+                        Text(message)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(AppColors.yellow)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
@@ -561,8 +540,10 @@ private struct GoalEditSheet: View {
     let onSave: (GoalDataUpdate) -> Void
 
     @State private var goalRawValue: String
+    @State private var goalStartWeightKg: String
     @State private var currentWeightKg: String
     @State private var targetWeightKg: String
+    @State private var desiredGoalDate: Date
     @State private var activityLevel: String
     @State private var validation = ""
     @State private var confirmReset = false
@@ -572,8 +553,10 @@ private struct GoalEditSheet: View {
         self._status = status
         self.onSave = onSave
         _goalRawValue = State(initialValue: profile.goalRawValue)
+        _goalStartWeightKg = State(initialValue: String(format: "%.1f", profile.goalStartWeightKg))
         _currentWeightKg = State(initialValue: String(format: "%.1f", profile.currentWeightKg))
         _targetWeightKg = State(initialValue: String(format: "%.1f", profile.targetWeightKg))
+        _desiredGoalDate = State(initialValue: profile.desiredGoalDate ?? NutritionCalculator.targets(for: profile).goalDate)
         _activityLevel = State(initialValue: String(format: "%.2f", profile.activityLevel))
     }
 
@@ -587,8 +570,13 @@ private struct GoalEditSheet: View {
             .pickerStyle(.menu)
             .tint(AppColors.purple)
 
+            PremiumTextField(placeholder: "Стартовый вес цели, кг", text: $goalStartWeightKg, keyboard: .decimalPad)
             PremiumTextField(placeholder: "Текущий вес, кг", text: $currentWeightKg, keyboard: .decimalPad)
             PremiumTextField(placeholder: "Целевой вес, кг", text: $targetWeightKg, keyboard: .decimalPad)
+            DatePicker("Хочу достичь к", selection: $desiredGoalDate, displayedComponents: .date)
+                .datePickerStyle(.compact)
+                .foregroundStyle(.white)
+                .tint(AppColors.purple)
             PremiumTextField(placeholder: "Активность TDEE множитель", text: $activityLevel, keyboard: .decimalPad)
 
             let preview = previewProfile
@@ -601,8 +589,20 @@ private struct GoalEditSheet: View {
                     Text("\(Int(targets.calories)) ккал • Б \(Int(targets.protein)) г • Ж \(Int(targets.fat)) г • У \(Int(targets.carbs)) г")
                         .foregroundStyle(AppColors.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
+                    Text("Нужный темп: \(signedWeight(targets.requiredWeeklyWeightDelta)) кг/нед.")
+                        .foregroundStyle(AppColors.secondaryText)
+                    Text("Плановый темп: \(signedWeight(targets.weeklyWeightDelta)) кг/нед.")
+                        .foregroundStyle(targets.isDateTooAggressive ? AppColors.yellow : AppColors.green)
                     Text("Ориентировочная дата: \(targets.goalDate.formatted(date: .abbreviated, time: .omitted))")
                         .foregroundStyle(AppColors.purple)
+                    if let message = targets.safetyMessage {
+                        Text(message)
+                            .foregroundStyle(AppColors.yellow)
+                            .fixedSize(horizontal: false, vertical: true)
+                        PremiumButton(title: "Использовать рекомендованную дату", icon: "calendar.badge.checkmark", tint: AppColors.purple) {
+                            desiredGoalDate = targets.recommendedGoalDate
+                        }
+                    }
                 }
             }
 
@@ -627,7 +627,7 @@ private struct GoalEditSheet: View {
         .confirmationDialog("Сбросить цель?", isPresented: $confirmReset) {
             Button("Сбросить", role: .destructive) {
                 let current = settingsNumber(currentWeightKg)
-                onSave(GoalDataUpdate(goalRawValue: FitnessGoal.maintenance.rawValue, currentWeightKg: current, targetWeightKg: current, activityLevel: settingsNumber(activityLevel)))
+                onSave(GoalDataUpdate(goalRawValue: FitnessGoal.maintenance.rawValue, goalStartWeightKg: current, currentWeightKg: current, targetWeightKg: current, desiredGoalDate: nil, activityLevel: settingsNumber(activityLevel)))
                 status = "Цель сброшена"
                 dismiss()
             }
@@ -644,6 +644,8 @@ private struct GoalEditSheet: View {
             heightCm: profile.heightCm,
             currentWeightKg: settingsNumber(currentWeightKg),
             targetWeightKg: settingsNumber(targetWeightKg),
+            goalStartWeightKg: settingsNumber(goalStartWeightKg),
+            desiredGoalDate: desiredGoalDate,
             goal: FitnessGoal(rawValue: goalRawValue) ?? profile.goal,
             activityLevel: settingsNumber(activityLevel),
             trainingDaysPerWeek: profile.trainingDaysPerWeek,
@@ -656,9 +658,14 @@ private struct GoalEditSheet: View {
     }
 
     private func validate() -> GoalDataUpdate? {
+        let start = settingsNumber(goalStartWeightKg)
         let current = settingsNumber(currentWeightKg)
         let target = settingsNumber(targetWeightKg)
         let activity = settingsNumber(activityLevel)
+        if !(35...250).contains(start) {
+            validation = "Стартовый вес должен быть 35-250 кг."
+            return nil
+        }
         if !(35...250).contains(current) {
             validation = "Текущий вес должен быть 35-250 кг."
             return nil
@@ -672,7 +679,11 @@ private struct GoalEditSheet: View {
             return nil
         }
         validation = ""
-        return GoalDataUpdate(goalRawValue: goalRawValue, currentWeightKg: current, targetWeightKg: target, activityLevel: activity)
+        return GoalDataUpdate(goalRawValue: goalRawValue, goalStartWeightKg: start, currentWeightKg: current, targetWeightKg: target, desiredGoalDate: desiredGoalDate, activityLevel: activity)
+    }
+
+    private func signedWeight(_ value: Double) -> String {
+        String(format: "%+.2f", value)
     }
 }
 
@@ -686,8 +697,10 @@ private struct ProfileDataUpdate {
 
 private struct GoalDataUpdate {
     let goalRawValue: String
+    let goalStartWeightKg: Double
     let currentWeightKg: Double
     let targetWeightKg: Double
+    let desiredGoalDate: Date?
     let activityLevel: Double
 }
 
