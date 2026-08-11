@@ -46,7 +46,7 @@ struct OpenFoodFactsSearchProvider: ProductSearchProvider {
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 12
-        request.setValue("AI Fitness Coach iOS - local-first product search", forHTTPHeaderField: "User-Agent")
+        request.setValue("work0ut iOS - local-first product search", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await session.data(for: request)
         guard (response as? HTTPURLResponse)?.statusCode ?? 500 < 400 else {

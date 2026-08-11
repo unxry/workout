@@ -381,13 +381,13 @@
 				DEVELOPMENT_TEAM = 62UBRUWU6H;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "AI Fitness Coach/Resources/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "AI Fitness Coach";
+				INFOPLIST_KEY_CFBundleDisplayName = work0ut;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSCameraUsageDescription = "AI Fitness Coach uses the camera to analyze meal photos when you choose to add food by photo.";
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "AI Fitness Coach uses Face ID to protect your profile and fitness data when you enable app lock.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "AI Fitness Coach uses steps, activity, weight, and sleep to adapt your plan.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "AI Fitness Coach does not write to Apple Health without explicit permission.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "AI Fitness Coach reads selected photos only when you choose a meal photo for local food analysis.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "work0ut uses the camera to analyze meal photos when you choose to add food by photo.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "work0ut uses Face ID to protect your profile and fitness data when you enable app lock.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "work0ut uses steps, activity, weight, and sleep to adapt your plan.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "work0ut does not write to Apple Health without explicit permission.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "work0ut reads selected photos only when you choose a meal photo for local food analysis.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -434,13 +434,13 @@
 				DEVELOPMENT_TEAM = 62UBRUWU6H;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "AI Fitness Coach/Resources/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "AI Fitness Coach";
+				INFOPLIST_KEY_CFBundleDisplayName = work0ut;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSCameraUsageDescription = "AI Fitness Coach uses the camera to analyze meal photos when you choose to add food by photo.";
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "AI Fitness Coach uses Face ID to protect your profile and fitness data when you enable app lock.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "AI Fitness Coach uses steps, activity, weight, and sleep to adapt your plan.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "AI Fitness Coach does not write to Apple Health without explicit permission.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "AI Fitness Coach reads selected photos only when you choose a meal photo for local food analysis.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "work0ut uses the camera to analyze meal photos when you choose to add food by photo.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "work0ut uses Face ID to protect your profile and fitness data when you enable app lock.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "work0ut uses steps, activity, weight, and sleep to adapt your plan.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "work0ut does not write to Apple Health without explicit permission.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "work0ut reads selected photos only when you choose a meal photo for local food analysis.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

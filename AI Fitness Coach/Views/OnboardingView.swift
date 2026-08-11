@@ -20,7 +20,7 @@ struct OnboardingView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("AI Fitness Coach")
+                    Text("work0ut")
                         .font(.system(size: 42, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                     Text("Настроим личного тренера, который будет жить на твоем iPhone и адаптировать стратегию каждый день.")

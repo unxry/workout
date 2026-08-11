@@ -21,15 +21,15 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.healthcare-fitness</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>AI Fitness Coach uses steps, activity, weight, and sleep to adapt your plan.</string>
+	<string>work0ut uses steps, activity, weight, and sleep to adapt your plan.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>AI Fitness Coach does not write to Apple Health without explicit permission.</string>
+	<string>work0ut does not write to Apple Health without explicit permission.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>AI Fitness Coach uses the camera to analyze meal photos when you choose to add food by photo.</string>
+	<string>work0ut uses the camera to analyze meal photos when you choose to add food by photo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>AI Fitness Coach reads selected photos only when you choose a meal photo for local food analysis.</string>
+	<string>work0ut reads selected photos only when you choose a meal photo for local food analysis.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>AI Fitness Coach uses Face ID to protect your profile and fitness data when you enable app lock.</string>
+	<string>work0ut uses Face ID to protect your profile and fitness data when you enable app lock.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
