@@ -6,6 +6,7 @@ final class LocalDataStore: ObservableObject {
     @Published private(set) var profiles: [UserProfile] = []
     @Published private(set) var meals: [MealEntry] = []
     @Published private(set) var metrics: [DailyMetric] = []
+    @Published private(set) var waterEntries: [WaterEntry] = []
     @Published private(set) var memories: [CoachMemory] = []
     @Published private(set) var workouts: [WorkoutLog] = []
     @Published private(set) var foodProducts: [FoodProduct] = NutritionDatabaseService.defaultProducts
@@ -84,6 +85,16 @@ final class LocalDataStore: ObservableObject {
         guard liters > 0 else { return }
         let metric = metricForDay(date, calendar: calendar)
         metric.waterLiters += liters
+        waterEntries.insert(WaterEntry(date: date, liters: liters), at: 0)
+        objectWillChange.send()
+        sort()
+        save()
+    }
+
+    func updateActivity(steps: Int, activeEnergyKcal: Double, on date: Date = .now, calendar: Calendar = .current) {
+        let metric = metricForDay(date, calendar: calendar)
+        metric.steps = max(steps, 0)
+        metric.activeEnergyKcal = max(activeEnergyKcal, 0)
         objectWillChange.send()
         sort()
         save()
@@ -115,6 +126,7 @@ final class LocalDataStore: ObservableObject {
             profiles = snapshot.profiles
             meals = snapshot.meals
             metrics = snapshot.metrics
+            waterEntries = snapshot.waterEntries
             memories = snapshot.memories
             workouts = snapshot.workouts
             foodProducts = NutritionDatabaseService.mergedProducts(local: snapshot.foodProducts)
@@ -128,7 +140,7 @@ final class LocalDataStore: ObservableObject {
         do {
             let folder = fileURL.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let snapshot = Snapshot(profiles: profiles, meals: meals, metrics: metrics, memories: memories, workouts: workouts, foodProducts: foodProducts)
+            let snapshot = Snapshot(profiles: profiles, meals: meals, metrics: metrics, waterEntries: waterEntries, memories: memories, workouts: workouts, foodProducts: foodProducts)
             let data = try JSONEncoder.localStore.encode(snapshot)
             try data.write(to: fileURL, options: [.atomic])
         } catch {
@@ -140,6 +152,7 @@ final class LocalDataStore: ObservableObject {
         profiles.sort { $0.createdAt < $1.createdAt }
         meals.sort { $0.date > $1.date }
         metrics.sort { $0.date < $1.date }
+        waterEntries.sort { $0.date > $1.date }
         memories.sort { $0.createdAt > $1.createdAt }
         workouts.sort { $0.date > $1.date }
         foodProducts.sort {
@@ -167,6 +180,7 @@ private struct Snapshot: Codable {
     var profiles: [UserProfile]
     var meals: [MealEntry]
     var metrics: [DailyMetric]
+    var waterEntries: [WaterEntry]
     var memories: [CoachMemory]
     var workouts: [WorkoutLog]
     var foodProducts: [FoodProduct]
@@ -175,6 +189,7 @@ private struct Snapshot: Codable {
         case profiles
         case meals
         case metrics
+        case waterEntries
         case memories
         case workouts
         case foodProducts
@@ -184,6 +199,17 @@ private struct Snapshot: Codable {
         self.profiles = profiles
         self.meals = meals
         self.metrics = metrics
+        self.waterEntries = []
+        self.memories = memories
+        self.workouts = workouts
+        self.foodProducts = foodProducts
+    }
+
+    init(profiles: [UserProfile], meals: [MealEntry], metrics: [DailyMetric], waterEntries: [WaterEntry], memories: [CoachMemory], workouts: [WorkoutLog], foodProducts: [FoodProduct]) {
+        self.profiles = profiles
+        self.meals = meals
+        self.metrics = metrics
+        self.waterEntries = waterEntries
         self.memories = memories
         self.workouts = workouts
         self.foodProducts = foodProducts
@@ -194,6 +220,7 @@ private struct Snapshot: Codable {
         profiles = try container.decodeIfPresent([UserProfile].self, forKey: .profiles) ?? []
         meals = try container.decodeIfPresent([MealEntry].self, forKey: .meals) ?? []
         metrics = try container.decodeIfPresent([DailyMetric].self, forKey: .metrics) ?? []
+        waterEntries = try container.decodeIfPresent([WaterEntry].self, forKey: .waterEntries) ?? []
         memories = try container.decodeIfPresent([CoachMemory].self, forKey: .memories) ?? []
         workouts = try container.decodeIfPresent([WorkoutLog].self, forKey: .workouts) ?? []
         foodProducts = try container.decodeIfPresent([FoodProduct].self, forKey: .foodProducts) ?? []

@@ -3,13 +3,17 @@ import SwiftUI
 import UIKit
 
 struct DashboardView: View {
+    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var store: LocalDataStore
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var showReminders = false
-    @State private var showPlan = false
+    @State private var activePlanDetail: PlanDetail?
     @State private var day = DayContext()
     @State private var lastRefresh = Date.now
+    @State private var healthStatus = "Данные Apple Health еще не синхронизированы."
+    @State private var hourlySteps: [StepHourBucket] = []
+    @State private var isSyncingHealth = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -26,13 +30,21 @@ struct DashboardView: View {
             .padding(.top, 18)
             .padding(.bottom, 144)
         }
-        .sheet(isPresented: $showPlan) {
-            SimpleInfoSheet(title: "План на день", rows: [
-                "Питание: держим цель по калориям и белку.",
-                "Активность: 10 000 шагов.",
-                "Вода: 2.5 л в течение дня.",
-                "Вес: короткая проверка динамики утром."
-            ])
+        .sheet(item: $activePlanDetail) { detail in
+            PlanDetailSheet(
+                detail: detail,
+                totals: totals,
+                targets: targets,
+                meals: todayMeals,
+                metric: todayMetric,
+                waterEntries: todayWaterEntries,
+                hourlySteps: hourlySteps,
+                healthStatus: healthStatus,
+                currentWeight: currentWeight,
+                targetWeight: targetWeight
+            ) {
+                Task { await syncHealthMetrics(requestAuthorization: true) }
+            }
         }
         .sheet(isPresented: $showReminders) {
             SimpleInfoSheet(title: "Напоминания", rows: reminders.map { "\($0.title) - \($0.subtitle) - \($0.time)" })
@@ -40,13 +52,19 @@ struct DashboardView: View {
         .onChange(of: scenePhase) { phase in
             if phase == .active {
                 refreshDay()
+                Task { await syncHealthMetrics(requestAuthorization: false) }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
             refreshDay()
+            Task { await syncHealthMetrics(requestAuthorization: false) }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in
             refreshDay()
+            Task { await syncHealthMetrics(requestAuthorization: false) }
+        }
+        .task {
+            await syncHealthMetrics(requestAuthorization: false)
         }
     }
 
@@ -62,6 +80,10 @@ struct DashboardView: View {
 
     private var todayMetric: DailyMetric? {
         store.metrics.last { day.contains($0.date) }
+    }
+
+    private var todayWaterEntries: [WaterEntry] {
+        store.waterEntries.filter { day.contains($0.date) }
     }
 
     private var totals: MacroTotals {
@@ -171,12 +193,20 @@ struct DashboardView: View {
 
     private var dayPlanSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "ПЛАН НА ДЕНЬ", actionTitle: "См. все") { showPlan = true }
+            SectionHeader(title: "ПЛАН НА ДЕНЬ", actionTitle: "См. все") { activePlanDetail = .all }
             VStack(spacing: 6) {
-                DashboardPlanRow(icon: "fork.knife", title: "Питание", value: "\(Int(totals.calories)) / \(Int(targets.calories)) ккал", percent: Int((totals.calories / targets.calories * 100).rounded()), progress: totals.calories / targets.calories, tint: AppColors.green)
-                DashboardPlanRow(icon: "figure.walk", title: "Активность", value: "\(todayMetric?.steps ?? 0) / 10 000 шагов", percent: Int((Double(todayMetric?.steps ?? 0) / 10_000 * 100).rounded()), progress: Double(todayMetric?.steps ?? 0) / 10_000, tint: AppColors.yellow)
-                DashboardPlanRow(icon: "drop.fill", title: "Вода", value: "\(String(format: "%.1f", todayMetric?.waterLiters ?? 0)) / \(String(format: "%.1f", targets.waterLiters)) л", percent: Int((((todayMetric?.waterLiters ?? 0) / targets.waterLiters) * 100).rounded()), progress: (todayMetric?.waterLiters ?? 0) / targets.waterLiters, tint: AppColors.blue)
-                DashboardPlanRow(icon: "scalemass", title: "Вес", value: "\(String(format: "%.1f", currentWeight)) / \(String(format: "%.1f", targetWeight)) кг", percent: Int(NutritionCalculator.progress(current: currentWeight, target: targetWeight) * 100), progress: NutritionCalculator.progress(current: currentWeight, target: targetWeight), tint: AppColors.purple)
+                DashboardPlanRow(icon: "fork.knife", title: "Питание", value: "\(Int(totals.calories)) / \(Int(targets.calories)) ккал", percent: Int((totals.calories / targets.calories * 100).rounded()), progress: totals.calories / targets.calories, tint: AppColors.green) {
+                    activePlanDetail = .nutrition
+                }
+                DashboardPlanRow(icon: "figure.walk", title: "Активность", value: "\(todayMetric?.steps ?? 0) / 10 000 шагов", percent: Int((Double(todayMetric?.steps ?? 0) / 10_000 * 100).rounded()), progress: Double(todayMetric?.steps ?? 0) / 10_000, tint: AppColors.yellow) {
+                    activePlanDetail = .activity
+                }
+                DashboardPlanRow(icon: "drop.fill", title: "Вода", value: "\(String(format: "%.1f", todayMetric?.waterLiters ?? 0)) / \(String(format: "%.1f", targets.waterLiters)) л", percent: Int((((todayMetric?.waterLiters ?? 0) / targets.waterLiters) * 100).rounded()), progress: (todayMetric?.waterLiters ?? 0) / targets.waterLiters, tint: AppColors.blue) {
+                    activePlanDetail = .water
+                }
+                DashboardPlanRow(icon: "scalemass", title: "Вес", value: "\(String(format: "%.1f", currentWeight)) / \(String(format: "%.1f", targetWeight)) кг", percent: Int(NutritionCalculator.progress(current: currentWeight, target: targetWeight) * 100), progress: NutritionCalculator.progress(current: currentWeight, target: targetWeight), tint: AppColors.purple) {
+                    activePlanDetail = .weight
+                }
             }
         }
     }
@@ -219,6 +249,31 @@ struct DashboardView: View {
     private func refreshDay() {
         day = DayContext()
         lastRefresh = .now
+    }
+
+    private func syncHealthMetrics(requestAuthorization: Bool) async {
+        guard !isSyncingHealth else { return }
+        guard appState.healthKit.isAvailable else {
+            healthStatus = "Apple Health недоступен на этом устройстве."
+            return
+        }
+
+        isSyncingHealth = true
+        defer { isSyncingHealth = false }
+
+        do {
+            if requestAuthorization {
+                try await appState.healthKit.requestAuthorization()
+            }
+            let snapshot = try await appState.healthKit.todayActivitySnapshot(calendar: day.calendar)
+            let buckets = try await appState.healthKit.hourlySteps(for: day)
+            store.updateActivity(steps: snapshot.steps, activeEnergyKcal: snapshot.activeEnergyKcal, on: .now, calendar: day.calendar)
+            hourlySteps = buckets
+            healthStatus = requestAuthorization ? "Apple Health подключен. Обновлено \(timeString(.now))." : "Синхронизировано с Apple Health: \(timeString(.now))."
+            lastRefresh = .now
+        } catch {
+            healthStatus = requestAuthorization ? "Не удалось подключить Apple Health: \(error.localizedDescription)" : "Открой детали активности и нажми «Считать из Здоровья»."
+        }
     }
 
     private func timeString(_ date: Date) -> String {
@@ -336,6 +391,195 @@ private struct WeightTrendVisual: View {
     }
 }
 
+private enum PlanDetail: String, Identifiable {
+    case all
+    case nutrition
+    case activity
+    case water
+    case weight
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "План на день"
+        case .nutrition: "Питание"
+        case .activity: "Активность"
+        case .water: "Вода"
+        case .weight: "Вес"
+        }
+    }
+}
+
+private struct PlanDetailSheet: View {
+    let detail: PlanDetail
+    let totals: MacroTotals
+    let targets: NutritionTargets
+    let meals: [MealEntry]
+    let metric: DailyMetric?
+    let waterEntries: [WaterEntry]
+    let hourlySteps: [StepHourBucket]
+    let healthStatus: String
+    let currentWeight: Double
+    let targetWeight: Double
+    let onSyncHealth: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            PremiumBackground()
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Text(detail.title)
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .background(Circle().fill(Color.white.opacity(0.10)))
+                        }
+                    }
+
+                    if detail == .all || detail == .nutrition { nutritionBlock }
+                    if detail == .all || detail == .activity { activityBlock }
+                    if detail == .all || detail == .water { waterBlock }
+                    if detail == .all || detail == .weight { weightBlock }
+                }
+                .padding(22)
+                .padding(.bottom, 28)
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var nutritionBlock: some View {
+        detailSection(title: "Питание", icon: "fork.knife", tint: AppColors.green) {
+            detailLine("Калории", "\(Int(totals.calories)) / \(Int(targets.calories)) ккал")
+            detailLine("Белок", "\(Int(totals.protein)) / \(Int(targets.protein)) г")
+            detailLine("Жиры", "\(Int(totals.fat)) / \(Int(targets.fat)) г")
+            detailLine("Углеводы", "\(Int(totals.carbs)) / \(Int(targets.carbs)) г")
+            Divider().overlay(Color.white.opacity(0.10))
+            if meals.isEmpty {
+                muted("Сегодня приемов пищи еще нет.")
+            } else {
+                ForEach(meals) { meal in
+                    detailLine(timeString(meal.date), "\(meal.title) • \(Int(meal.calories)) ккал")
+                }
+            }
+        }
+    }
+
+    private var activityBlock: some View {
+        detailSection(title: "Активность", icon: "figure.walk", tint: AppColors.yellow) {
+            detailLine("Шаги", "\(metric?.steps ?? 0) / 10 000")
+            detailLine("Активная энергия", "\(Int((metric?.activeEnergyKcal ?? 0).rounded())) ккал")
+            muted(healthStatus)
+            Button {
+                onSyncHealth()
+            } label: {
+                Label("Считать из Здоровья", systemImage: "heart.text.square")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Capsule().fill(AppColors.purple.opacity(0.24)))
+                    .overlay(Capsule().stroke(AppColors.purple.opacity(0.65), lineWidth: 1))
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+
+            Divider().overlay(Color.white.opacity(0.10))
+            if hourlySteps.isEmpty {
+                muted("Почасовая история шагов появится после синхронизации Apple Health.")
+            } else {
+                ForEach(hourlySteps) { bucket in
+                    detailLine(hourRange(bucket), "\(bucket.steps) шагов")
+                }
+            }
+        }
+    }
+
+    private var waterBlock: some View {
+        detailSection(title: "Вода", icon: "drop.fill", tint: AppColors.blue) {
+            detailLine("Выпито", "\(String(format: "%.1f", metric?.waterLiters ?? 0)) / \(String(format: "%.1f", targets.waterLiters)) л")
+            Divider().overlay(Color.white.opacity(0.10))
+            if waterEntries.isEmpty {
+                muted("Сегодня воду еще не добавляли.")
+            } else {
+                ForEach(waterEntries) { entry in
+                    detailLine(timeString(entry.date), "+\(String(format: "%.2f", entry.liters)) л")
+                }
+            }
+        }
+    }
+
+    private var weightBlock: some View {
+        detailSection(title: "Вес", icon: "scalemass", tint: AppColors.purple) {
+            detailLine("Текущий вес", "\(String(format: "%.1f", currentWeight)) кг")
+            detailLine("Цель", "\(String(format: "%.1f", targetWeight)) кг")
+            detailLine("Прогресс", "\(Int(NutritionCalculator.progress(current: currentWeight, target: targetWeight) * 100))%")
+            if let metric {
+                detailLine("Последняя запись", "\(timeString(metric.date)) • \(String(format: "%.1f", metric.weightKg)) кг")
+            }
+        }
+    }
+
+    private func detailSection<Content: View>(title: String, icon: String, tint: Color, @ViewBuilder content: () -> Content) -> some View {
+        PremiumCard(padding: 16, radius: 18) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: icon)
+                        .foregroundStyle(tint)
+                        .frame(width: 24)
+                    Text(title)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                content()
+            }
+        }
+    }
+
+    private func detailLine(_ title: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(title)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(AppColors.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 10)
+            Text(value)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.90))
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func muted(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(AppColors.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func timeString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func hourRange(_ bucket: StepHourBucket) -> String {
+        "\(timeString(bucket.start))-\(timeString(bucket.end))"
+    }
+}
+
 private struct DashboardPlanRow: View {
     let icon: String
     let title: String
@@ -343,30 +587,42 @@ private struct DashboardPlanRow: View {
     let percent: Int
     let progress: Double
     let tint: Color
+    let action: () -> Void
 
     var body: some View {
-        PremiumCard(padding: 12, radius: 14) {
-            HStack(spacing: 14) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(tint)
-                    .frame(width: 26)
-                Text(title)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 106, alignment: .leading)
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(value)
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            PremiumCard(padding: 12, radius: 14) {
+                HStack(spacing: 14) {
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(tint)
+                        .frame(width: 26)
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 106, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(value)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.86))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                        GradientProgressBar(progress: progress, tint: tint, height: 4)
+                    }
+                    Spacer(minLength: 8)
+                    Text("\(percent)%")
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.86))
-                    GradientProgressBar(progress: progress, tint: tint, height: 4)
+                        .foregroundStyle(.white.opacity(0.88))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(AppColors.mutedText)
                 }
-                Spacer(minLength: 8)
-                Text("\(percent)%")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.88))
             }
         }
+        .buttonStyle(.plain)
     }
 }
 

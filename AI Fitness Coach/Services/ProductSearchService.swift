@@ -124,17 +124,39 @@ final class ProductSearchService {
     }
 
     func search(query: String, localProducts: [FoodProduct], includeInternet: Bool = true) async -> ProductSearchOutcome {
-        let localResults = (try? await LocalProductSearchProvider(products: localProducts).search(query: query)) ?? []
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let localResults = (try? await LocalProductSearchProvider(products: localProducts).search(query: trimmed)) ?? []
+        guard !trimmed.isEmpty else {
+            return ProductSearchOutcome(results: Array(localResults.prefix(12)), usedInternet: false, message: nil)
+        }
+
         guard includeInternet else {
-            return ProductSearchOutcome(results: localResults, usedInternet: false, message: "Интернет недоступен - показаны сохраненные продукты.")
+            return ProductSearchOutcome(results: localResults, usedInternet: false, message: "Показаны сохраненные продукты. Нажми поиск, чтобы проверить интернет-источник.")
         }
 
         do {
-            let remoteResults = try await remoteProvider.search(query: query)
+            let remoteResults = try await remoteProvider.search(query: trimmed)
             let merged = merge(localResults + remoteResults)
             return ProductSearchOutcome(results: merged, usedInternet: true, message: remoteResults.isEmpty ? "В интернете не найдено подтвержденных карточек. Показаны локальные продукты." : nil)
         } catch {
-            return ProductSearchOutcome(results: localResults, usedInternet: false, message: "Интернет недоступен - показаны сохраненные продукты.")
+            return ProductSearchOutcome(results: localResults, usedInternet: false, message: message(for: error))
+        }
+    }
+
+    private func message(for error: Error) -> String {
+        guard let urlError = error as? URLError else {
+            return "Не удалось выполнить интернет-поиск. Показаны сохраненные продукты."
+        }
+
+        switch urlError.code {
+        case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
+            return "Интернет недоступен - показаны сохраненные продукты."
+        case .timedOut:
+            return "Интернет-поиск не успел ответить. Показаны сохраненные продукты."
+        case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
+            return "Источник продуктов сейчас недоступен. Показаны сохраненные продукты."
+        default:
+            return "Не удалось выполнить интернет-поиск (\(urlError.code.rawValue)). Показаны сохраненные продукты."
         }
     }
 

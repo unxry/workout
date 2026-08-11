@@ -116,6 +116,18 @@ final class DailyMetric: Identifiable, Codable {
     }
 }
 
+final class WaterEntry: Identifiable, Codable {
+    var id: UUID
+    var date: Date
+    var liters: Double
+
+    init(id: UUID = UUID(), date: Date = .now, liters: Double) {
+        self.id = id
+        self.date = date
+        self.liters = liters
+    }
+}
+
 final class MealEntry: Identifiable, Codable {
     var id: UUID
     var date: Date

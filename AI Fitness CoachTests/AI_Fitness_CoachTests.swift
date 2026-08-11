@@ -185,7 +185,19 @@ final class AI_Fitness_CoachTests: XCTestCase {
 
         XCTAssertFalse(outcome.usedInternet)
         XCTAssertTrue(outcome.results.contains { $0.product.id == "cottage-cheese-5" })
-        XCTAssertEqual(outcome.message, "Интернет недоступен - показаны сохраненные продукты.")
+        XCTAssertEqual(outcome.message, "Показаны сохраненные продукты. Нажми поиск, чтобы проверить интернет-источник.")
+    }
+
+    func testProductSearchEmptyQueryDoesNotClaimInternetIsUnavailable() async {
+        let outcome = await ProductSearchService(remoteProvider: EmptyProductSearchProvider()).search(
+            query: "",
+            localProducts: NutritionDatabaseService.defaultProducts,
+            includeInternet: false
+        )
+
+        XCTAssertFalse(outcome.usedInternet)
+        XCTAssertNil(outcome.message)
+        XCTAssertFalse(outcome.results.isEmpty)
     }
 
     func testProductSearchMergesDuplicateProducts() async {
