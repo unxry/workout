@@ -12,9 +12,7 @@ struct SettingsView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                PageHeader(title: "Профиль") {
-                    appState.selectedTab = .coach
-                }
+                PageHeader(title: "Профиль")
 
                 profileCard
                 statsGrid
@@ -23,7 +21,7 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 18)
-            .padding(.bottom, 118)
+            .padding(.bottom, 144)
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
@@ -46,23 +44,10 @@ struct SettingsView: View {
                         profile.activityLevel = updated.activityLevel
                     }
                 }
-            case .nutrition:
-                SimpleInfoSheet(title: "Питание", rows: ["Аллергии: \(profile.allergies.isEmpty ? "не указаны" : profile.allergies)", "Исключенные продукты: \(profile.excludedFoods.isEmpty ? "нет" : profile.excludedFoods)", "Приемов пищи: \(profile.preferredMealsPerDay)"])
-            case .training:
-                SimpleInfoSheet(title: "Тренировки", rows: ["Опыт: средний", "Дней в неделю: \(profile.trainingDaysPerWeek)", "Оборудование: зал + дом"])
             case .health:
                 HealthPermissionsSheet(status: $statusMessage)
             case .notifications:
                 NotificationsSettingsSheet(status: $statusMessage)
-            case .ai:
-                AliceAISettingsSheet()
-                    .environmentObject(appState)
-            case .security:
-                SecuritySheet(status: $statusMessage)
-            case .privacy:
-                PrivacySheet(exportRows: exportRows, deleteAll: deleteAllData)
-            case .about:
-                SimpleInfoSheet(title: "О приложении", rows: ["AI Fitness Coach", "Версия 1.0.0", "Локальные данные + Yandex AI", "Поддержка: GitHub unxry/workout"])
             }
         }
         .alert("Статус", isPresented: Binding(get: { !statusMessage.isEmpty }, set: { if !$0 { statusMessage = "" } })) {
@@ -298,12 +283,10 @@ struct SettingsView: View {
 
     private func status(for sheet: ProfileSheet) -> String? {
         switch sheet {
-        case .ai:
-            appState.apiKeyStatus == .configured ? "Вкл." : nil
-        case .security:
-            "Вкл."
-        case .about:
-            "1.0.0"
+        case .health:
+            nil
+        case .notifications:
+            nil
         default:
             nil
         }
@@ -327,14 +310,8 @@ struct SettingsView: View {
 enum ProfileSheet: String, CaseIterable, Identifiable {
     case myData
     case goal
-    case nutrition
-    case training
-    case health
     case notifications
-    case ai
-    case security
-    case privacy
-    case about
+    case health
 
     var id: String { rawValue }
 
@@ -342,14 +319,8 @@ enum ProfileSheet: String, CaseIterable, Identifiable {
         switch self {
         case .myData: "Мои данные"
         case .goal: "Цель"
-        case .nutrition: "Питание"
-        case .training: "Тренировки"
-        case .health: "Здоровье и разрешения"
         case .notifications: "Уведомления"
-        case .ai: "Алиса AI"
-        case .security: "Безопасность"
-        case .privacy: "Конфиденциальность"
-        case .about: "О приложении"
+        case .health: "Здоровье и разрешения"
         }
     }
 
@@ -357,14 +328,8 @@ enum ProfileSheet: String, CaseIterable, Identifiable {
         switch self {
         case .myData: "Рост, вес, возраст, пол"
         case .goal: "Тип цели, целевой вес, темп"
-        case .nutrition: "Предпочтения, аллергии, исключенные продукты"
-        case .training: "Опыт, оборудование, предпочтения"
-        case .health: "HealthKit, доступы к данным"
         case .notifications: "Напоминания и оповещения"
-        case .ai: "API key, Folder ID, проверка подключения"
-        case .security: "Face ID, код-пароль"
-        case .privacy: "Экспорт данных, удалить все данные"
-        case .about: "Версия, поддержка, лицензии"
+        case .health: "HealthKit, камера, фото, уведомления"
         }
     }
 
@@ -372,25 +337,17 @@ enum ProfileSheet: String, CaseIterable, Identifiable {
         switch self {
         case .myData: "person.fill"
         case .goal: "target"
-        case .nutrition: "fork.knife"
-        case .training: "dumbbell"
-        case .health: "heart"
         case .notifications: "bell"
-        case .ai: "sparkles"
-        case .security: "lock"
-        case .privacy: "shield"
-        case .about: "info.circle"
+        case .health: "heart"
         }
     }
 
     var tint: Color {
         switch self {
-        case .myData, .ai: AppColors.purple
-        case .goal, .privacy: AppColors.green
-        case .nutrition, .notifications: AppColors.yellow
-        case .training: AppColors.purple
-        case .health, .security: AppColors.blue
-        case .about: AppColors.secondaryText
+        case .myData: AppColors.purple
+        case .goal: AppColors.green
+        case .notifications: AppColors.yellow
+        case .health: AppColors.blue
         }
     }
 }
@@ -447,7 +404,7 @@ private struct ProfileSettingsRow: View {
                 if let status {
                     Text(status)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(sheet == .security ? AppColors.purple : AppColors.secondaryText)
+                        .foregroundStyle(AppColors.secondaryText)
                 }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 18, weight: .semibold))
@@ -505,90 +462,6 @@ private struct NotificationsSettingsSheet: View {
             } catch {
                 status = error.localizedDescription
             }
-        }
-    }
-}
-
-private struct AliceAISettingsSheet: View {
-    @EnvironmentObject private var appState: AppState
-    @Environment(\.dismiss) private var dismiss
-    @State private var key = ""
-    @State private var folderID = ""
-    @State private var status = ""
-    @State private var isTesting = false
-
-    var body: some View {
-        FoodFormShell(title: "Алиса AI") {
-            Text("Yandex Cloud AI Studio")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-            Text(appState.apiKeyStatus.isConfigured ? "Подключение настроено. Секреты хранятся только в Keychain." : "Не настроено. Алиса покажет понятную ошибку вместо фейкового ответа.")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(AppColors.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-            SecureField("Yandex API Key", text: $key)
-                .textFieldStyle(.plain)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white)
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.075)))
-            PremiumTextField(placeholder: "Folder ID", text: $folderID)
-            Text("Модель выбирается автоматически: YandexGPT Lite. Фото-анализ не будет имитироваться, пока не подключен официальный vision endpoint.")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(AppColors.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button("Сохранить") {
-                    let storedKey = key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? KeychainStore.shared.readYandexAPIKey() : key
-                    let storedFolder = folderID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? KeychainStore.shared.readYandexFolderID() : folderID
-                    appState.saveAliceConfiguration(apiKey: storedKey, folderID: storedFolder)
-                    key = ""
-                    folderID = ""
-                    status = appState.apiKeyStatus.isConfigured ? "Настройки сохранены" : "Заполните API Key и Folder ID"
-                }
-                Button("Удалить ключ") {
-                    appState.deleteAliceConfiguration()
-                    key = ""
-                    folderID = ""
-                    status = "Ключ удален"
-                }
-                Button(isTesting ? "Проверяю..." : "Проверить") {
-                    Task {
-                        let typedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let typedFolder = folderID.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !typedKey.isEmpty || !typedFolder.isEmpty {
-                            appState.saveAliceConfiguration(
-                                apiKey: typedKey.isEmpty ? KeychainStore.shared.readYandexAPIKey() : typedKey,
-                                folderID: typedFolder.isEmpty ? KeychainStore.shared.readYandexFolderID() : typedFolder
-                            )
-                            key = ""
-                            folderID = ""
-                        }
-                        isTesting = true
-                        defer { isTesting = false }
-                        do {
-                            try await appState.aiClient.testConnection()
-                            appState.refreshAliceStatus()
-                            status = "Подключено"
-                        } catch {
-                            status = AIClientError.from(error).localizedDescription
-                        }
-                    }
-                }
-                .disabled(isTesting)
-            }
-            .buttonStyle(.bordered)
-            .tint(AppColors.purple)
-            if !status.isEmpty {
-                Text(status)
-                    .foregroundStyle(status == "Подключено" ? AppColors.green : AppColors.yellow)
-            }
-            PremiumButton(title: "Готово", icon: "checkmark", tint: AppColors.green) {
-                dismiss()
-            }
-        }
-        .onAppear {
-            appState.refreshAliceStatus()
         }
     }
 }

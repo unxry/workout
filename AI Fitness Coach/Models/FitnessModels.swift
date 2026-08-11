@@ -5,7 +5,6 @@ enum FitnessGoal: String, Codable, CaseIterable, Identifiable {
     case muscleGain = "Набор массы"
     case recomposition = "Рекомпозиция"
     case maintenance = "Поддержание"
-    case cutting = "Сушка"
 
     var id: String { rawValue }
 }
@@ -179,5 +178,110 @@ final class WorkoutLog: Identifiable, Codable {
         self.durationMinutes = durationMinutes
         self.calories = calories
         self.notes = notes
+    }
+}
+
+struct FoodProduct: Identifiable, Codable, Equatable {
+    var id: String
+    var name: String
+    var aliases: [String]
+    var category: String
+    var kcalPer100g: Double
+    var proteinPer100g: Double
+    var fatPer100g: Double
+    var carbsPer100g: Double
+    var fiberPer100g: Double?
+    var sugarPer100g: Double?
+    var barcode: String?
+    var brand: String?
+    var packageGrams: Double?
+    var source: String
+    var sourceURL: URL?
+    var isFavorite: Bool
+    var lastUsedAt: Date?
+
+    init(
+        id: String,
+        name: String,
+        aliases: [String] = [],
+        category: String,
+        kcalPer100g: Double,
+        proteinPer100g: Double,
+        fatPer100g: Double,
+        carbsPer100g: Double,
+        fiberPer100g: Double? = nil,
+        sugarPer100g: Double? = nil,
+        barcode: String? = nil,
+        brand: String? = nil,
+        packageGrams: Double? = nil,
+        source: String = "Локальная база",
+        sourceURL: URL? = nil,
+        isFavorite: Bool = false,
+        lastUsedAt: Date? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.aliases = aliases
+        self.category = category
+        self.kcalPer100g = kcalPer100g
+        self.proteinPer100g = proteinPer100g
+        self.fatPer100g = fatPer100g
+        self.carbsPer100g = carbsPer100g
+        self.fiberPer100g = fiberPer100g
+        self.sugarPer100g = sugarPer100g
+        self.barcode = barcode
+        self.brand = brand
+        self.packageGrams = packageGrams
+        self.source = source
+        self.sourceURL = sourceURL
+        self.isFavorite = isFavorite
+        self.lastUsedAt = lastUsedAt
+    }
+}
+
+enum FoodRecognitionStatus: String, Codable, Equatable {
+    case food = "FOOD"
+    case notFood = "NOT_FOOD"
+    case uncertain = "UNCERTAIN"
+}
+
+struct FoodEstimateItem: Codable, Equatable {
+    var productID: String?
+    var name: String
+    var estimatedGrams: Double
+    var confidence: Double
+    var calories: Double
+    var protein: Double
+    var fat: Double
+    var carbs: Double
+
+    enum CodingKeys: String, CodingKey {
+        case productID = "product_id"
+        case name
+        case estimatedGrams = "estimated_grams"
+        case confidence
+        case calories
+        case protein
+        case fat
+        case carbs
+    }
+}
+
+struct NutritionEstimateTotal: Codable, Equatable {
+    var calories: Double
+    var protein: Double
+    var fat: Double
+    var carbs: Double
+}
+
+struct FoodPhotoAnalysis: Codable, Equatable {
+    var status: FoodRecognitionStatus
+    var confidence: Double
+    var message: String
+    var items: [FoodEstimateItem]
+    var total: NutritionEstimateTotal?
+
+    var isFood: Bool {
+        status == .food
     }
 }

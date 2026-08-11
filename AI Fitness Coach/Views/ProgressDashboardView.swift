@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct ProgressDashboardView: View {
-    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var store: LocalDataStore
 
     @State private var selectedTab = "Сегодня"
@@ -18,9 +17,7 @@ struct ProgressDashboardView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 22) {
-                PageHeader(title: "Тренировки") {
-                    appState.selectedTab = .coach
-                }
+                PageHeader(title: "Тренировки")
 
                 tabSelector
                 todayWorkoutCard
@@ -30,7 +27,7 @@ struct ProgressDashboardView: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 18)
-            .padding(.bottom, 118)
+            .padding(.bottom, 144)
         }
         .sheet(item: $selectedExercise) { exercise in
             ExerciseDetailSheet(exercise: exercise) {

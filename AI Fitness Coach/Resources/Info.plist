@@ -27,11 +27,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>AI Fitness Coach uses the camera to analyze meal photos when you choose to add food by photo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>AI Fitness Coach reads selected photos to analyze food and answer questions about images you attach.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>AI Fitness Coach uses the microphone for voice food logging and voice messages to the AI coach.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>AI Fitness Coach uses speech recognition to transcribe your voice before sending or parsing it.</string>
+	<string>AI Fitness Coach reads selected photos only when you choose a meal photo for local food analysis.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>AI Fitness Coach uses Face ID to protect your profile and fitness data when you enable app lock.</string>
 	<key>UISupportedInterfaceOrientations</key>

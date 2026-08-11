@@ -3,7 +3,6 @@ import SwiftUI
 import UIKit
 
 struct NutritionView: View {
-    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var store: LocalDataStore
 
     @State private var activeSheet: NutritionSheet?
@@ -26,14 +25,12 @@ struct NutritionView: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 18)
-            .padding(.bottom, 118)
+            .padding(.bottom, 144)
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .photo:
                 PhotoFoodSheet { saveMeal($0) }
-            case .voice:
-                VoiceFoodSheet { saveMeal($0) }
             case .manual:
                 ManualFoodSheet { saveMeal($0) }
             case .search:
@@ -85,11 +82,6 @@ struct NutritionView: View {
                 }
                 .buttonStyle(.plain)
             }
-            Spacer()
-            AIHelperButton(title: "Алиса AI") {
-                appState.selectedTab = .coach
-            }
-            .padding(.top, 10)
         }
     }
     private var targets: NutritionTargets {
@@ -98,11 +90,11 @@ struct NutritionView: View {
     }
 
     private var todayMeals: [MealEntry] {
-        store.meals.filter { Calendar.current.isDateInToday($0.date) }
+        let day = DayContext(date: selectedDate)
+        return store.meals.filter { day.contains($0.date) }
     }
 
     private var totals: MacroTotals {
-        guard !todayMeals.isEmpty else { return MacroTotals(calories: 1850, protein: 135, fat: 62, carbs: 190) }
         return MacroTotals(
             calories: todayMeals.reduce(0) { $0 + $1.calories },
             protein: todayMeals.reduce(0) { $0 + $1.protein },
@@ -225,11 +217,10 @@ struct NutritionView: View {
     }
 
     private var quickAddGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 82), spacing: 8)], spacing: 8) {
-            QuickActionCard(icon: "camera", title: "Фото еды", subtitle: "Алиса распознает\nблюдо", tint: AppColors.green) { activeSheet = .photo }
-            QuickActionCard(icon: "mic", title: "Голосом", subtitle: "Просто скажи,\nчто съел", tint: AppColors.purple) { activeSheet = .voice }
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+            QuickActionCard(icon: "camera", title: "Фото еды", subtitle: "Локальный анализ\nбез интернета", tint: AppColors.green) { activeSheet = .photo }
             QuickActionCard(icon: "pencil", title: "Вручную", subtitle: "Ввести продукты\nсамому", tint: AppColors.blue) { activeSheet = .manual }
-            QuickActionCard(icon: "magnifyingglass", title: "Найти продукт", subtitle: "Поиск в базе\nпродуктов", tint: AppColors.orange) { activeSheet = .search }
+            QuickActionCard(icon: "magnifyingglass", title: "Найти продукт", subtitle: "Локально +\nинтернет", tint: AppColors.orange) { activeSheet = .search }
         }
     }
 
@@ -270,7 +261,7 @@ struct NutritionView: View {
                         Text("Сегодня еще нет приемов пищи")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
-                        Text("Добавь еду фото, голосом, вручную или через поиск.")
+                        Text("Добавь еду по фото, вручную или через поиск продукта.")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(AppColors.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -321,7 +312,8 @@ struct NutritionView: View {
     }
 
     private func saveMeal(_ draft: MealDraft) {
-        store.addMeal(MealEntry(title: draft.title, calories: draft.calories, protein: draft.protein, fat: draft.fat, carbs: draft.carbs, source: draft.source))
+        let date = Calendar.current.isDateInToday(selectedDate) ? Date.now : selectedDate
+        store.addMeal(MealEntry(date: date, title: draft.title, calories: draft.calories, protein: draft.protein, fat: draft.fat, carbs: draft.carbs, source: draft.source))
         Haptics.success()
         mealMessage = "\(draft.title) добавлено"
     }
@@ -333,9 +325,8 @@ struct NutritionView: View {
     }
 }
 
-private enum NutritionSheet: String, Identifiable {
+enum NutritionSheet: String, Identifiable {
     case photo
-    case voice
     case manual
     case search
     case details
@@ -461,7 +452,7 @@ private struct MealDisplayRow: View {
     }
 }
 
-private struct ManualFoodSheet: View {
+struct ManualFoodSheet: View {
     @Environment(\.dismiss) private var dismiss
     let onSave: (MealDraft) -> Void
     @State private var title = ""
@@ -491,8 +482,7 @@ private struct ManualFoodSheet: View {
     }
 }
 
-private struct PhotoFoodSheet: View {
-    @EnvironmentObject private var appState: AppState
+struct PhotoFoodSheet: View {
     @Environment(\.dismiss) private var dismiss
     let onSave: (MealDraft) -> Void
     @State private var pickerItem: PhotosPickerItem?
@@ -511,7 +501,7 @@ private struct PhotoFoodSheet: View {
 
     var body: some View {
         FoodFormShell(title: "Фото еды") {
-            Text("Оценка по фотографии может быть неточной.")
+            Text("Фото анализируется локально. Калории считаются из базы продуктов, а не придумываются моделью.")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(AppColors.yellow)
 
@@ -561,7 +551,7 @@ private struct PhotoFoodSheet: View {
             Button {
                 Task { await analyze() }
             } label: {
-                Label(isAnalyzing ? "Анализ..." : "Анализировать", systemImage: "sparkles")
+                Label(isAnalyzing ? "Анализирую фото..." : "Анализировать локально", systemImage: "camera.metering.center.weighted")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -655,23 +645,20 @@ private struct PhotoFoodSheet: View {
     }
 
     private func analyze() async {
-        guard let imageData else { return }
+        guard imageData != nil else { return }
+        guard let image else { return }
         isAnalyzing = true
         errorMessage = nil
         defer { isAnalyzing = false }
-        do {
-            let result = try await appState.aiClient.analyzeFoodImage(imageData: imageData, mimeType: "image/jpeg", context: "Пользователь добавляет прием пищи по фото.")
-            analysis = result
-            if result.isFood, let total = result.total {
-                title = result.items.map(\.name).joined(separator: ", ")
-                grams = "\(Int(result.items.reduce(0) { $0 + $1.estimatedGrams }))"
-                calories = "\(Int(total.calories))"
-                protein = "\(Int(total.protein))"
-                fat = "\(Int(total.fat))"
-                carbs = "\(Int(total.carbs))"
-            }
-        } catch {
-            errorMessage = AIClientError.from(error).localizedDescription
+        let result = await FoodPhotoAnalysisService().analyze(image)
+        analysis = result
+        if result.isFood, let total = result.total {
+            title = result.items.map(\.name).joined(separator: ", ")
+            grams = "\(Int(result.items.reduce(0) { $0 + $1.estimatedGrams }))"
+            calories = "\(Int(total.calories))"
+            protein = "\(Int(total.protein))"
+            fat = "\(Int(total.fat))"
+            carbs = "\(Int(total.carbs))"
         }
     }
 
@@ -688,155 +675,129 @@ private struct PhotoFoodSheet: View {
     }
 }
 
-private struct VoiceFoodSheet: View {
-    @EnvironmentObject private var appState: AppState
+struct SearchFoodSheet: View {
+    @EnvironmentObject private var store: LocalDataStore
     @Environment(\.dismiss) private var dismiss
     let onSave: (MealDraft) -> Void
-    @StateObject private var speech = SpeechRecognitionService()
-    @State private var transcript = ""
-    @State private var analysis: FoodPhotoAnalysis?
-    @State private var isParsing = false
-    @State private var errorMessage: String?
+    @State private var query = ""
+    @State private var gramsByID: [String: String] = [:]
+    @State private var results: [ProductSearchResult] = []
+    @State private var message: String?
+    @State private var isSearching = false
 
     var body: some View {
-        FoodFormShell(title: "Голосом") {
-            ZStack {
-                Circle().fill(AppColors.purple.opacity(0.14)).frame(width: 132, height: 132)
-                Circle().stroke(AppColors.purple.opacity(0.75), lineWidth: 3).frame(width: 98, height: 98)
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 42, weight: .bold))
-                    .foregroundStyle(speech.isRecording ? AppColors.green : AppColors.purple)
-            }
-            .frame(maxWidth: .infinity)
-
-            Text(speech.isRecording ? "Слушаю..." : "Нажми и говори")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(speech.isRecording ? AppColors.green : AppColors.secondaryText)
-                .frame(maxWidth: .infinity)
-
-            PremiumTextField(placeholder: "Распознанный текст", text: $transcript)
-            HStack {
-                Button(speech.isRecording ? "Остановить" : "Записать") {
-                    if speech.isRecording {
-                        speech.stop()
-                    } else {
-                        Task { await speech.start() }
-                    }
+        FoodFormShell(title: "Найти продукт") {
+            HStack(spacing: 10) {
+                PremiumTextField(placeholder: "Например: творог Простоквашино 5%", text: $query)
+                Button {
+                    Task { await search(includeInternet: true) }
+                } label: {
+                    Image(systemName: isSearching ? "hourglass" : "magnifyingglass")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 52, height: 52)
+                        .background(Circle().fill(AppColors.purple.opacity(0.75)))
                 }
-                Button("Отмена") {
-                    speech.stop()
-                    dismiss()
-                }
+                .buttonStyle(.plain)
+                .disabled(isSearching || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .buttonStyle(.bordered)
-            .tint(AppColors.purple)
 
-            Button(isParsing ? "Распознаю..." : "Распознать питание") {
-                Task { await parse() }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(AppColors.purple)
-            .disabled(transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isParsing)
-
-            if let errorMessage {
-                PremiumCard(padding: 14, radius: 16) {
-                    Text(errorMessage)
-                        .font(.system(size: 15, weight: .medium))
+            if let message {
+                PremiumCard(padding: 12, radius: 14) {
+                    Text(message)
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(AppColors.yellow)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
-            if let analysis {
-                if analysis.isFood, let total = analysis.total {
-                    PremiumCard(padding: 14, radius: 16) {
-                        Text("\(analysis.items.map(\.name).joined(separator: ", ")) • ~\(Int(total.calories)) ккал • Б \(Int(total.protein)) г • Ж \(Int(total.fat)) г • У \(Int(total.carbs)) г")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    PremiumButton(title: "Подтвердить", icon: "checkmark", tint: AppColors.green) {
-                        onSave(MealDraft(title: analysis.items.map(\.name).joined(separator: ", "), calories: total.calories, protein: total.protein, fat: total.fat, carbs: total.carbs, source: "voice"))
-                        dismiss()
-                    }
-                } else {
-                    PremiumCard(padding: 14, radius: 16) {
-                        Text(analysis.message.isEmpty ? "Не удалось распознать еду в тексте." : analysis.message)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(AppColors.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+            ForEach(results) { result in
+                productRow(result)
             }
         }
-        .onChange(of: speech.transcript) { value in
-            transcript = value
-        }
-        .onChange(of: speech.errorMessage) { value in
-            errorMessage = value
-        }
-        .onDisappear {
-            speech.stop()
+        .task {
+            await search(includeInternet: false)
         }
     }
 
-    private func parse() async {
-        let text = VoiceTranscript.normalizedForFoodParsing(transcript)
-        guard VoiceTranscript.isParseable(text) else {
-            errorMessage = "Не удалось распознать речь."
-            return
-        }
-        transcript = text
-        isParsing = true
-        errorMessage = nil
-        defer { isParsing = false }
-        do {
-            analysis = try await appState.aiClient.parseFoodText(text, context: "Пользователь добавляет прием пищи голосом.")
-        } catch {
-            errorMessage = AIClientError.from(error).localizedDescription
-        }
-    }
-}
+    private func productRow(_ result: ProductSearchResult) -> some View {
+        let product = result.product
+        let gramsText = Binding(
+            get: { gramsByID[product.id] ?? String(Int(product.packageGrams ?? 100)) },
+            set: { gramsByID[product.id] = $0 }
+        )
+        let grams = max(number(gramsText.wrappedValue), 0)
+        let total = NutritionDatabaseService.nutrition(for: product, grams: grams)
 
-private struct SearchFoodSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let onSave: (MealDraft) -> Void
-    @State private var query = ""
-
-    let products = [
-        MealDraft(title: "Куриная грудка 200 г", calories: 330, protein: 62, fat: 7, carbs: 0, source: "search"),
-        MealDraft(title: "Творог 5% 150 г", calories: 180, protein: 20, fat: 7, carbs: 5, source: "search"),
-        MealDraft(title: "Рис вареный 150 г", calories: 195, protein: 4, fat: 1, carbs: 43, source: "search")
-    ]
-
-    var body: some View {
-        FoodFormShell(title: "Найти продукт") {
-            PremiumTextField(placeholder: "Поиск продукта", text: $query)
-            ForEach(products.filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) }, id: \.title) { product in
-                Button {
-                    onSave(product)
-                    dismiss()
-                } label: {
-                    PremiumCard(padding: 14, radius: 16) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(product.title)
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                Text("\(Int(product.calories)) ккал • Б \(Int(product.protein)) • Ж \(Int(product.fat)) • У \(Int(product.carbs))")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(AppColors.secondaryText)
-                            }
-                            Spacer()
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(AppColors.green)
-                                .font(.title2)
+        return PremiumCard(padding: 14, radius: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(product.name)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let brand = product.brand, !brand.isEmpty {
+                            Text(brand)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(AppColors.secondaryText)
                         }
+                        Text("Источник: \(result.source)")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(AppColors.purple)
                     }
+                    Spacer()
+                    Image(systemName: result.hasConfirmedNutrition ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(result.hasConfirmedNutrition ? AppColors.green : AppColors.yellow)
                 }
-                .buttonStyle(.plain)
+
+                if result.hasConfirmedNutrition {
+                    Text("\(Int(product.kcalPer100g)) ккал / 100 г • Б \(format(product.proteinPer100g)) • Ж \(format(product.fatPer100g)) • У \(format(product.carbsPer100g))")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(AppColors.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 10) {
+                        PremiumTextField(placeholder: "граммы", text: gramsText, keyboard: .decimalPad)
+                        Button {
+                            store.upsertFoodProduct(product)
+                            store.markFoodProductUsed(product.id)
+                            onSave(MealDraft(title: "\(product.name) \(Int(grams)) г", calories: total.calories, protein: total.protein, fat: total.fat, carbs: total.carbs, source: "search:\(result.source)"))
+                            dismiss()
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 30, weight: .bold))
+                                .foregroundStyle(AppColors.green)
+                                .frame(width: 52, height: 52)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(grams <= 0)
+                    }
+
+                    Text("Итого: \(Int(total.calories)) ккал • Б \(Int(total.protein)) г • Ж \(Int(total.fat)) г • У \(Int(total.carbs)) г")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.88))
+                } else {
+                    Text(result.notice ?? "БЖУ не указаны источником.")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(AppColors.yellow)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
+    }
+
+    private func search(includeInternet: Bool) async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        isSearching = true
+        defer { isSearching = false }
+        let outcome = await ProductSearchService().search(query: trimmed, localProducts: store.foodProducts, includeInternet: includeInternet && !trimmed.isEmpty)
+        results = outcome.results
+        message = outcome.message
+    }
+
+    private func format(_ value: Double) -> String {
+        value.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(value))" : String(format: "%.1f", value)
     }
 }
 

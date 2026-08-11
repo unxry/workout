@@ -23,7 +23,7 @@ enum NutritionCalculator {
         let calories: Double
 
         switch profile.goal {
-        case .fatLoss, .cutting:
+        case .fatLoss:
             weeklyDelta = -0.45
             calories = max(tdee - 450, bmr * 1.12)
         case .muscleGain:

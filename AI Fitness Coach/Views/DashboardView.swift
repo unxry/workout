@@ -1,12 +1,15 @@
 import Charts
 import SwiftUI
+import UIKit
 
 struct DashboardView: View {
-    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var store: LocalDataStore
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var showReminders = false
     @State private var showPlan = false
+    @State private var day = DayContext()
+    @State private var lastRefresh = Date.now
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -15,13 +18,13 @@ struct DashboardView: View {
                 SectionHeader(title: "СВОДКА ЗА ДЕНЬ")
                 summaryGrid
                 weightTrendSection
-                aiRecommendation
+                localInsightSection
                 dayPlanSection
                 remindersSection
             }
             .padding(.horizontal, 18)
             .padding(.top, 18)
-            .padding(.bottom, 118)
+            .padding(.bottom, 144)
         }
         .sheet(isPresented: $showPlan) {
             SimpleInfoSheet(title: "План на день", rows: [
@@ -34,6 +37,17 @@ struct DashboardView: View {
         .sheet(isPresented: $showReminders) {
             SimpleInfoSheet(title: "Напоминания", rows: reminders.map { "\($0.title) - \($0.subtitle) - \($0.time)" })
         }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                refreshDay()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            refreshDay()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in
+            refreshDay()
+        }
     }
 
     private var profile: UserProfile? { store.profile }
@@ -43,13 +57,14 @@ struct DashboardView: View {
     }
 
     private var todayMeals: [MealEntry] {
-        store.meals.filter { Calendar.current.isDateInToday($0.date) }
+        store.meals.filter { day.contains($0.date) }
+    }
+
+    private var todayMetric: DailyMetric? {
+        store.metrics.last { day.contains($0.date) }
     }
 
     private var totals: MacroTotals {
-        guard !todayMeals.isEmpty else {
-            return MacroTotals(calories: 3250, protein: 148.5, fat: 126.9, carbs: 356)
-        }
         return MacroTotals(
             calories: todayMeals.reduce(0) { $0 + $1.calories },
             protein: todayMeals.reduce(0) { $0 + $1.protein },
@@ -59,28 +74,19 @@ struct DashboardView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("05.08.2026")
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                HStack(spacing: 7) {
-                    Text("Обновлено 23:58")
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(AppColors.secondaryText)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(day.formattedDate)
+                .font(.system(size: 32, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            HStack(spacing: 7) {
+                Text("Обновлено \(timeString(lastRefresh))")
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 13, weight: .semibold))
             }
-
-            Spacer()
-
-            AIHelperButton(title: "Алиса AI") {
-                appState.selectedTab = .coach
-            }
-            .padding(.top, 4)
+            .font(.system(size: 16, weight: .medium))
+            .foregroundStyle(AppColors.secondaryText)
         }
     }
 
@@ -109,43 +115,49 @@ struct DashboardView: View {
         }
     }
 
-    private var aiRecommendation: some View {
+    private var localInsightSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(title: "РЕКОМЕНДАЦИЯ АЛИСЫ")
+            SectionHeader(title: "СОВЕТ НА СЕГОДНЯ")
             PremiumCard(padding: 18, radius: 20) {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 18) {
-                        AIAvatar(size: 78)
-                        aiRecommendationText
+                        insightIcon(size: 72)
+                        insightText
                             .layoutPriority(1)
-                        aiAskButton
                     }
 
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack(alignment: .top, spacing: 14) {
-                            AIAvatar(size: 72)
-                            aiRecommendationText
+                            insightIcon(size: 68)
+                            insightText
                                 .layoutPriority(1)
                         }
-                        aiAskButton
-                            .frame(maxWidth: 210, alignment: .leading)
                     }
                 }
             }
         }
     }
 
-    private var aiRecommendationText: some View {
+    private var insight: LocalCoachInsight {
+        LocalCoachEngine.insight(totals: totals, targets: targets, metrics: store.metrics, weightHistory: store.metrics, now: day.date, calendar: day.calendar)
+    }
+
+    private var insightTint: Color {
+        switch insight.tintName {
+        case "blue": AppColors.blue
+        case "yellow": AppColors.yellow
+        case "green": AppColors.green
+        default: AppColors.purple
+        }
+    }
+
+    private var insightText: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("Сегодня ты на \(Int((totals.calories / targets.calories * 100).rounded()))% по калориям.")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white.opacity(0.86))
-                .fixedSize(horizontal: false, vertical: true)
-            Text(totals.calories > targets.calories ? "Отличный результат." : "Держим темп спокойно.")
+            Text(insight.title)
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(AppColors.green)
+                .foregroundStyle(insightTint)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Хочешь подсказку по питанию или прогрессу?")
+            Text(insight.message)
                 .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(AppColors.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -153,25 +165,8 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var aiAskButton: some View {
-        Button {
-            Haptics.tap()
-            appState.openAlice(with: "Дай подсказку по питанию и прогрессу на сегодня.")
-        } label: {
-            Text("Спросить Алису")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(height: 44)
-                .padding(.horizontal, 22)
-                .background(
-                    Capsule()
-                        .fill(Color.white.opacity(0.045))
-                        .overlay(Capsule().stroke(AppColors.purple, lineWidth: 1.8))
-                        .shadow(color: AppColors.purple.opacity(0.30), radius: 9)
-                )
-                .fixedSize(horizontal: true, vertical: false)
-        }
-        .buttonStyle(.plain)
+    private func insightIcon(size: CGFloat) -> some View {
+        IconBadge(systemName: "lightbulb.fill", tint: insightTint, size: size)
     }
 
     private var dayPlanSection: some View {
@@ -179,8 +174,8 @@ struct DashboardView: View {
             SectionHeader(title: "ПЛАН НА ДЕНЬ", actionTitle: "См. все") { showPlan = true }
             VStack(spacing: 6) {
                 DashboardPlanRow(icon: "fork.knife", title: "Питание", value: "\(Int(totals.calories)) / \(Int(targets.calories)) ккал", percent: Int((totals.calories / targets.calories * 100).rounded()), progress: totals.calories / targets.calories, tint: AppColors.green)
-                DashboardPlanRow(icon: "figure.walk", title: "Активность", value: "8 250 / 10 000 шагов", percent: 82, progress: 0.82, tint: AppColors.yellow)
-                DashboardPlanRow(icon: "drop.fill", title: "Вода", value: "1.8 / \(String(format: "%.1f", targets.waterLiters)) л", percent: 72, progress: 0.72, tint: AppColors.blue)
+                DashboardPlanRow(icon: "figure.walk", title: "Активность", value: "\(todayMetric?.steps ?? 0) / 10 000 шагов", percent: Int((Double(todayMetric?.steps ?? 0) / 10_000 * 100).rounded()), progress: Double(todayMetric?.steps ?? 0) / 10_000, tint: AppColors.yellow)
+                DashboardPlanRow(icon: "drop.fill", title: "Вода", value: "\(String(format: "%.1f", todayMetric?.waterLiters ?? 0)) / \(String(format: "%.1f", targets.waterLiters)) л", percent: Int((((todayMetric?.waterLiters ?? 0) / targets.waterLiters) * 100).rounded()), progress: (todayMetric?.waterLiters ?? 0) / targets.waterLiters, tint: AppColors.blue)
                 DashboardPlanRow(icon: "scalemass", title: "Вес", value: "\(String(format: "%.1f", currentWeight)) / \(String(format: "%.1f", targetWeight)) кг", percent: Int(NutritionCalculator.progress(current: currentWeight, target: targetWeight) * 100), progress: NutritionCalculator.progress(current: currentWeight, target: targetWeight), tint: AppColors.purple)
             }
         }
@@ -211,15 +206,33 @@ struct DashboardView: View {
     private var weightPoints: [WeightVisualPoint] {
         if store.metrics.count >= 3 {
             let recent = store.metrics.suffix(3)
-            return recent.enumerated().map { index, metric in
-                WeightVisualPoint(label: ["01.08", "03.08", "05.08"][min(index, 2)], value: metric.weightKg)
+            return recent.map { metric in
+                WeightVisualPoint(label: shortDate(metric.date), value: metric.weightKg)
             }
         }
-        return [
-            WeightVisualPoint(label: "01.08", value: 62.0),
-            WeightVisualPoint(label: "03.08", value: 63.2),
-            WeightVisualPoint(label: "05.08", value: 63.0)
-        ]
+        if let profile {
+            return [WeightVisualPoint(label: shortDate(.now), value: profile.currentWeightKg)]
+        }
+        return []
+    }
+
+    private func refreshDay() {
+        day = DayContext()
+        lastRefresh = .now
+    }
+
+    private func timeString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "dd.MM"
+        return formatter.string(from: date)
     }
 }
 
@@ -242,7 +255,7 @@ private struct WeightTrendVisual: View {
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let chartRect = CGRect(x: 12, y: 18, width: size.width - 24, height: size.height - 48)
+            let chartRect = CGRect(x: 12, y: 18, width: max(1, size.width - 24), height: size.height - 48)
             let coordinates = makeCoordinates(in: chartRect)
             ZStack {
                 if coordinates.count >= 2 {
@@ -277,6 +290,13 @@ private struct WeightTrendVisual: View {
                             .foregroundStyle(AppColors.mutedText)
                             .position(x: point.x, y: chartRect.maxY + 22)
                     }
+                } else {
+                    Text("История веса появится после нескольких записей.")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(AppColors.secondaryText)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.horizontal, 18)
                 }
             }
         }
@@ -313,25 +333,6 @@ private struct WeightTrendVisual: View {
             path.closeSubpath()
         }
         return path
-    }
-}
-
-private struct AIAvatar: View {
-    let size: CGFloat
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(AppColors.purple.opacity(0.16))
-                .overlay(Circle().stroke(AppColors.purple, lineWidth: 3))
-                .shadow(color: AppColors.purple.opacity(0.35), radius: 14)
-            Image(systemName: "sparkles")
-                .font(.system(size: size * 0.48, weight: .bold))
-                .foregroundStyle(
-                    LinearGradient(colors: [AppColors.purple, AppColors.blue], startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
-        }
-        .frame(width: size, height: size)
     }
 }
 

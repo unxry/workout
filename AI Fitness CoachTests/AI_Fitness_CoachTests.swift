@@ -1,5 +1,4 @@
 import XCTest
-import UIKit
 @testable import AI_Fitness_Coach
 
 final class AI_Fitness_CoachTests: XCTestCase {
@@ -51,6 +50,53 @@ final class AI_Fitness_CoachTests: XCTestCase {
         XCTAssertEqual(Int(timer.remaining(now: start.addingTimeInterval(150))), 60)
     }
 
+    func testEntryBeforeAndAfterMidnightBelongToDifferentDays() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Moscow")!
+        let dayA = calendar.date(from: DateComponents(year: 2026, month: 8, day: 11, hour: 23, minute: 59))!
+        let dayB = calendar.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 0, minute: 1))!
+
+        let contextA = DayContext(date: dayA, calendar: calendar)
+        let contextB = DayContext(date: dayB, calendar: calendar)
+
+        XCTAssertTrue(contextA.contains(dayA))
+        XCTAssertFalse(contextA.contains(dayB))
+        XCTAssertTrue(contextB.contains(dayB))
+        XCTAssertFalse(contextB.contains(dayA))
+    }
+
+    func testDashboardNewDayTotalsAreZeroAndYesterdayIsPreserved() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Moscow")!
+        let yesterday = calendar.date(from: DateComponents(year: 2026, month: 8, day: 11, hour: 23, minute: 59))!
+        let today = calendar.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 0, minute: 1))!
+        let meals = [MealEntry(date: yesterday, title: "Рис и курица", calories: 500, protein: 40, fat: 10, carbs: 55)]
+
+        let todayTotals = DailyTotalsCalculator.macroTotals(for: meals, day: DayContext(date: today, calendar: calendar))
+        let yesterdayTotals = DailyTotalsCalculator.macroTotals(for: meals, day: DayContext(date: yesterday, calendar: calendar))
+
+        XCTAssertEqual(todayTotals.calories, 0)
+        XCTAssertEqual(todayTotals.protein, 0)
+        XCTAssertEqual(yesterdayTotals.calories, 500)
+        XCTAssertEqual(yesterdayTotals.protein, 40)
+    }
+
+    func testTimezoneChangeCreatesDifferentDayContext() {
+        var moscow = Calendar(identifier: .gregorian)
+        moscow.timeZone = TimeZone(identifier: "Europe/Moscow")!
+        var vladivostok = Calendar(identifier: .gregorian)
+        vladivostok.timeZone = TimeZone(identifier: "Asia/Vladivostok")!
+        let date = calendarDate(year: 2026, month: 8, day: 11, hour: 22, minute: 30, timeZone: TimeZone(secondsFromGMT: 0)!)
+
+        XCTAssertNotEqual(DayContext(date: date, calendar: moscow).start, DayContext(date: date, calendar: vladivostok).start)
+    }
+
+    private func calendarDate(year: Int, month: Int, day: Int, hour: Int, minute: Int, timeZone: TimeZone) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
+    }
+
     func testGoalRecalculationProducesMacroTargets() {
         let profile = UserProfile(
             name: "Test",
@@ -75,108 +121,99 @@ final class AI_Fitness_CoachTests: XCTestCase {
         XCTAssertGreaterThan(targets.waterLiters, 2)
     }
 
-    func testFoodStructuredResponseDecodesFood() throws {
-        let json = """
-        {"status":"FOOD","confidence":0.91,"message":"Еда обнаружена","items":[{"name":"куриная грудка","estimated_grams":180,"calories":297,"protein":55,"fat":6,"carbs":0}],"total":{"calories":297,"protein":55,"fat":6,"carbs":0}}
-        """
-        let analysis = try JSONDecoder().decode(FoodPhotoAnalysis.self, from: Data(json.utf8))
+    func testNutritionLookupAndGramsCalculation() {
+        let database = NutritionDatabaseService()
+        let product = database.product(id: "chicken-breast")!
+        let total = NutritionDatabaseService.nutrition(for: product, grams: 180)
+
+        XCTAssertEqual(Int(total.calories.rounded()), 297)
+        XCTAssertEqual(Int(total.protein.rounded()), 56)
+        XCTAssertEqual(Int(total.fat.rounded()), 6)
+        XCTAssertEqual(Int(total.carbs.rounded()), 0)
+    }
+
+    func testLocalFoodPhotoAnalysisRecognizesFoodFromClassifications() {
+        let analysis = FoodPhotoAnalysisService().analyze([
+            VisionClassification(identifier: "fried chicken, chicken breast", confidence: 0.72)
+        ])
+
+        XCTAssertEqual(analysis.status, .food)
         XCTAssertTrue(analysis.isFood)
-        XCTAssertEqual(analysis.items.first?.name, "куриная грудка")
-        XCTAssertEqual(analysis.total?.protein, 55)
+        XCTAssertEqual(analysis.items.first?.productID, "chicken-breast")
+        XCTAssertNotNil(analysis.total)
     }
 
-    func testFoodStructuredResponseDecodesNonFoodWithoutNutrition() throws {
-        let json = """
-        {"status":"NOT_FOOD","confidence":0.96,"message":"На фото нет еды.","items":[],"total":null}
-        """
-        let analysis = try JSONDecoder().decode(FoodPhotoAnalysis.self, from: Data(json.utf8))
-        XCTAssertFalse(analysis.isFood)
+    func testLocalFoodPhotoAnalysisRejectsNonFood() {
+        let analysis = FoodPhotoAnalysisService().analyze([
+            VisionClassification(identifier: "flower, daisy", confidence: 0.88)
+        ])
+
         XCTAssertEqual(analysis.status, .notFood)
-        XCTAssertNil(analysis.total)
-    }
-
-    func testFoodStructuredResponseDecodesUncertainWithoutNutrition() throws {
-        let json = """
-        {"status":"UNCERTAIN","confidence":0.34,"message":"Не удалось уверенно определить блюдо.","items":[],"total":null}
-        """
-        let analysis = try JSONDecoder().decode(FoodPhotoAnalysis.self, from: Data(json.utf8))
         XCTAssertFalse(analysis.isFood)
-        XCTAssertEqual(analysis.status, .uncertain)
+        XCTAssertTrue(analysis.items.isEmpty)
         XCTAssertNil(analysis.total)
     }
 
-    func testNonFoodNormalizationDropsHallucinatedNutrition() {
-        let hallucinated = FoodPhotoAnalysis(
-            status: .notFood,
-            confidence: 0.97,
-            message: "На фото цветы.",
-            items: [FoodEstimateItem(name: "омлет", estimatedGrams: 220, calories: 410, protein: 24, fat: 28, carbs: 8)],
-            total: NutritionEstimateTotal(calories: 410, protein: 24, fat: 28, carbs: 8)
+    func testLocalFoodPhotoAnalysisCanReturnUncertain() {
+        let analysis = FoodPhotoAnalysisService().analyze([
+            VisionClassification(identifier: "unknown object", confidence: 0.22)
+        ])
+
+        XCTAssertEqual(analysis.status, .uncertain)
+        XCTAssertFalse(analysis.isFood)
+        XCTAssertNil(analysis.total)
+    }
+
+    func testMultipleFoodsAreCalculatedTogether() {
+        let analysis = FoodPhotoAnalysisService().analyze([
+            VisionClassification(identifier: "chicken", confidence: 0.70),
+            VisionClassification(identifier: "rice", confidence: 0.64),
+            VisionClassification(identifier: "salad", confidence: 0.51)
+        ])
+
+        XCTAssertEqual(analysis.status, .food)
+        XCTAssertEqual(analysis.items.count, 3)
+        XCTAssertGreaterThan(analysis.total?.calories ?? 0, 400)
+    }
+
+    func testProductSearchOfflineCacheMessage() async {
+        let outcome = await ProductSearchService(remoteProvider: EmptyProductSearchProvider()).search(
+            query: "творог",
+            localProducts: NutritionDatabaseService.defaultProducts,
+            includeInternet: false
         )
 
-        let normalized = FoodAnalysisValidator.normalized(hallucinated)
-
-        XCTAssertEqual(normalized.status, .notFood)
-        XCTAssertFalse(normalized.isFood)
-        XCTAssertTrue(normalized.items.isEmpty)
-        XCTAssertNil(normalized.total)
+        XCTAssertFalse(outcome.usedInternet)
+        XCTAssertTrue(outcome.results.contains { $0.product.id == "cottage-cheese-5" })
+        XCTAssertEqual(outcome.message, "Интернет недоступен - показаны сохраненные продукты.")
     }
 
-    func testLowConfidenceFoodBecomesUncertain() {
-        let uncertain = FoodPhotoAnalysis(
-            status: .food,
-            confidence: 0.30,
-            message: "",
-            items: [FoodEstimateItem(name: "рис", estimatedGrams: 100, calories: 130, protein: 3, fat: 0, carbs: 28)],
-            total: NutritionEstimateTotal(calories: 130, protein: 3, fat: 0, carbs: 28)
-        )
+    func testProductSearchMergesDuplicateProducts() async {
+        let remote = StaticProductSearchProvider(results: [
+            ProductSearchResult(product: FoodProduct(id: "remote-cottage", name: "Творог 5%", category: "Интернет", kcalPer100g: 121, proteinPer100g: 17, fatPer100g: 5, carbsPer100g: 2, barcode: "123", source: "Test"), source: "Test", hasConfirmedNutrition: true, notice: nil),
+            ProductSearchResult(product: FoodProduct(id: "remote-cottage-duplicate", name: "Творог 5%", category: "Интернет", kcalPer100g: 121, proteinPer100g: 17, fatPer100g: 5, carbsPer100g: 2, barcode: "123", source: "Test"), source: "Test", hasConfirmedNutrition: true, notice: nil)
+        ])
 
-        let normalized = FoodAnalysisValidator.normalized(uncertain)
+        let outcome = await ProductSearchService(remoteProvider: remote).search(query: "творог", localProducts: [], includeInternet: true)
 
-        XCTAssertEqual(normalized.status, .uncertain)
-        XCTAssertFalse(normalized.isFood)
-        XCTAssertTrue(normalized.items.isEmpty)
-        XCTAssertNil(normalized.total)
+        XCTAssertTrue(outcome.usedInternet)
+        XCTAssertEqual(outcome.results.filter { $0.product.barcode == "123" }.count, 1)
     }
+}
 
-    func testAIImageAttachmentPayloadUsesDataURL() {
-        let payload = AIImageAttachmentPayload(imageData: Data([1, 2, 3]), mimeType: "image/jpeg")
+private struct EmptyProductSearchProvider: ProductSearchProvider {
+    let name = "Empty"
 
-        XCTAssertTrue(payload.dataURL.hasPrefix("data:image/jpeg;base64,"))
-        XCTAssertTrue(payload.dataURL.contains("AQID"))
+    func search(query: String) async throws -> [ProductSearchResult] {
+        []
     }
+}
 
-    func testImagePreparationResizesAndCompressesJPEG() throws {
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2_000, height: 1_000))
-        let image = renderer.image { context in
-            UIColor.red.setFill()
-            context.fill(CGRect(x: 0, y: 0, width: 2_000, height: 1_000))
-        }
+private struct StaticProductSearchProvider: ProductSearchProvider {
+    let name = "Static"
+    let results: [ProductSearchResult]
 
-        let payload = try ImagePreparationService.prepareJPEG(from: image, maxPixel: 1_280, compression: 0.75)
-
-        XCTAssertEqual(payload.mimeType, "image/jpeg")
-        XCTAssertLessThanOrEqual(max(payload.pixelWidth, payload.pixelHeight), 1_280)
-        XCTAssertFalse(payload.data.isEmpty)
-    }
-
-    func testVoiceTranscriptNormalizesFoodInput() {
-        let text = "  Я съел\nтри   яйца, сто грамм риса  "
-
-        XCTAssertEqual(VoiceTranscript.normalizedForFoodParsing(text), "Я съел три яйца, сто грамм риса")
-        XCTAssertTrue(VoiceTranscript.isParseable(text))
-        XCTAssertFalse(VoiceTranscript.isParseable("   \n "))
-    }
-
-    func testAPIKeyState() {
-        XCTAssertTrue(APIKeyStatus.configured.isConfigured)
-        XCTAssertFalse(APIKeyStatus.missing.isConfigured)
-    }
-
-    func testOfflineAIErrorMapping() {
-        let error = AIClientError.from(URLError(.notConnectedToInternet))
-
-        XCTAssertEqual(error, .noInternet)
-        XCTAssertEqual(error.localizedDescription, "Нет подключения к интернету.")
+    func search(query: String) async throws -> [ProductSearchResult] {
+        results
     }
 }

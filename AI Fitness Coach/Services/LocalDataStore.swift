@@ -8,6 +8,7 @@ final class LocalDataStore: ObservableObject {
     @Published private(set) var metrics: [DailyMetric] = []
     @Published private(set) var memories: [CoachMemory] = []
     @Published private(set) var workouts: [WorkoutLog] = []
+    @Published private(set) var foodProducts: [FoodProduct] = NutritionDatabaseService.defaultProducts
 
     private let fileURL: URL
 
@@ -62,6 +63,44 @@ final class LocalDataStore: ObservableObject {
         save()
     }
 
+    func upsertFoodProduct(_ product: FoodProduct) {
+        if let index = foodProducts.firstIndex(where: { $0.id == product.id || ($0.barcode != nil && $0.barcode == product.barcode) }) {
+            foodProducts[index] = product
+        } else {
+            foodProducts.insert(product, at: 0)
+        }
+        sort()
+        save()
+    }
+
+    func markFoodProductUsed(_ productID: String) {
+        guard let index = foodProducts.firstIndex(where: { $0.id == productID }) else { return }
+        foodProducts[index].lastUsedAt = .now
+        sort()
+        save()
+    }
+
+    func addWater(liters: Double, on date: Date = .now, calendar: Calendar = .current) {
+        guard liters > 0 else { return }
+        let metric = metricForDay(date, calendar: calendar)
+        metric.waterLiters += liters
+        objectWillChange.send()
+        sort()
+        save()
+    }
+
+    func recordWeight(_ weightKg: Double, on date: Date = .now, calendar: Calendar = .current) {
+        guard (35...250).contains(weightKg) else { return }
+        let metric = metricForDay(date, calendar: calendar)
+        metric.weightKg = weightKg
+        updateProfile { profile in
+            profile.currentWeightKg = weightKg
+        }
+        objectWillChange.send()
+        sort()
+        save()
+    }
+
     func deleteDiaryProgressAndWorkouts() {
         meals.removeAll()
         metrics.removeAll()
@@ -78,6 +117,7 @@ final class LocalDataStore: ObservableObject {
             metrics = snapshot.metrics
             memories = snapshot.memories
             workouts = snapshot.workouts
+            foodProducts = NutritionDatabaseService.mergedProducts(local: snapshot.foodProducts)
             sort()
         } catch {
             assertionFailure("LocalDataStore decode failed: \(error)")
@@ -88,7 +128,7 @@ final class LocalDataStore: ObservableObject {
         do {
             let folder = fileURL.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let snapshot = Snapshot(profiles: profiles, meals: meals, metrics: metrics, memories: memories, workouts: workouts)
+            let snapshot = Snapshot(profiles: profiles, meals: meals, metrics: metrics, memories: memories, workouts: workouts, foodProducts: foodProducts)
             let data = try JSONEncoder.localStore.encode(snapshot)
             try data.write(to: fileURL, options: [.atomic])
         } catch {
@@ -102,6 +142,24 @@ final class LocalDataStore: ObservableObject {
         metrics.sort { $0.date < $1.date }
         memories.sort { $0.createdAt > $1.createdAt }
         workouts.sort { $0.date > $1.date }
+        foodProducts.sort {
+            switch ($0.lastUsedAt, $1.lastUsedAt) {
+            case let (lhs?, rhs?): return lhs > rhs
+            case (_?, nil): return true
+            case (nil, _?): return false
+            case (nil, nil): return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        }
+    }
+
+    private func metricForDay(_ date: Date, calendar: Calendar) -> DailyMetric {
+        if let existing = metrics.first(where: { calendar.isDate($0.date, inSameDayAs: date) }) {
+            return existing
+        }
+        let weight = profile?.currentWeightKg ?? metrics.last?.weightKg ?? 0
+        let metric = DailyMetric(date: date, weightKg: weight)
+        metrics.append(metric)
+        return metric
     }
 }
 
@@ -111,6 +169,35 @@ private struct Snapshot: Codable {
     var metrics: [DailyMetric]
     var memories: [CoachMemory]
     var workouts: [WorkoutLog]
+    var foodProducts: [FoodProduct]
+
+    enum CodingKeys: String, CodingKey {
+        case profiles
+        case meals
+        case metrics
+        case memories
+        case workouts
+        case foodProducts
+    }
+
+    init(profiles: [UserProfile], meals: [MealEntry], metrics: [DailyMetric], memories: [CoachMemory], workouts: [WorkoutLog], foodProducts: [FoodProduct]) {
+        self.profiles = profiles
+        self.meals = meals
+        self.metrics = metrics
+        self.memories = memories
+        self.workouts = workouts
+        self.foodProducts = foodProducts
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        profiles = try container.decodeIfPresent([UserProfile].self, forKey: .profiles) ?? []
+        meals = try container.decodeIfPresent([MealEntry].self, forKey: .meals) ?? []
+        metrics = try container.decodeIfPresent([DailyMetric].self, forKey: .metrics) ?? []
+        memories = try container.decodeIfPresent([CoachMemory].self, forKey: .memories) ?? []
+        workouts = try container.decodeIfPresent([WorkoutLog].self, forKey: .workouts) ?? []
+        foodProducts = try container.decodeIfPresent([FoodProduct].self, forKey: .foodProducts) ?? []
+    }
 }
 
 private extension JSONEncoder {

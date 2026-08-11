@@ -19,7 +19,9 @@ struct RootView: View {
 
 private struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var store: LocalDataStore
     @State private var showQuickActions = false
+    @State private var statusMessage = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,8 +31,6 @@ private struct MainTabView: View {
                     DashboardView()
                 case .nutrition:
                     NutritionView()
-                case .coach:
-                    CoachView()
                 case .profile:
                     SettingsView()
                 }
@@ -43,113 +43,128 @@ private struct MainTabView: View {
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .sheet(isPresented: $showQuickActions) {
-            AIQuickComposerSheet(
-                submit: { prompt in
-                    showQuickActions = false
-                    appState.openAlice(with: prompt)
+            QuickAddSheet(
+                onSaveMeal: { draft in
+                    store.addMeal(MealEntry(title: draft.title, calories: draft.calories, protein: draft.protein, fat: draft.fat, carbs: draft.carbs, source: draft.source))
+                    statusMessage = "\(draft.title) добавлено"
                 },
-                openChat: {
-                    showQuickActions = false
-                    appState.selectedTab = .coach
+                onAddWater: { liters in
+                    store.addWater(liters: liters)
+                    statusMessage = "Вода добавлена"
+                },
+                onRecordWeight: { weight in
+                    store.recordWeight(weight)
+                    statusMessage = "Вес сохранен"
                 }
             )
+            .environmentObject(store)
             .presentationDetents([.large, .medium])
             .presentationDragIndicator(.visible)
+        }
+        .alert("Готово", isPresented: Binding(get: { !statusMessage.isEmpty }, set: { if !$0 { statusMessage = "" } })) {
+            Button("OK") { statusMessage = "" }
+        } message: {
+            Text(statusMessage)
         }
     }
 }
 
-private struct AIQuickComposerSheet: View {
-    let submit: (String) -> Void
-    let openChat: () -> Void
-    @State private var prompt = ""
+private struct QuickAddSheet: View {
+    let onSaveMeal: (MealDraft) -> Void
+    let onAddWater: (Double) -> Void
+    let onRecordWeight: (Double) -> Void
+    @State private var activeSheet: NutritionSheet?
+    @State private var water = "0.25"
+    @State private var weight = ""
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack {
             PremiumBackground()
             VStack(alignment: .leading, spacing: 16) {
-                Text("Алиса")
+                Text("Быстро добавить")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                TextField("Спроси Алису...", text: $prompt, axis: .vertical)
-                    .lineLimit(3...6)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white.opacity(0.075)))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                PremiumButton(title: "Спросить Алису", icon: "paperplane.fill", tint: AppColors.purple) {
-                    let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !text.isEmpty else { return }
-                    submit(text)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 142), spacing: 10)], spacing: 10) {
+                    quickAction("Фото еды", icon: "camera", tint: AppColors.green) { activeSheet = .photo }
+                    quickAction("Добавить вручную", icon: "pencil", tint: AppColors.blue) { activeSheet = .manual }
+                    quickAction("Найти продукт", icon: "magnifyingglass", tint: AppColors.orange) { activeSheet = .search }
                 }
 
-                openFullChatButton
-
-                ScrollView(showsIndicators: false) {
+                PremiumCard(padding: 14, radius: 18) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Быстрые запросы")
+                        Text("Вода")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 148), spacing: 10)], spacing: 10) {
-                            quickPrompt("Сфотографировать еду", "Я хочу сфотографировать еду и оценить калории.")
-                            quickPrompt("Спросить Алису", "Сколько калорий и белка мне осталось сегодня?")
-                            quickPrompt("Разобрать прогресс", "Проанализируй мой вес и прогресс за последнее время.")
-                            quickPrompt("Выбрать фото", "Я хочу отправить фото еды и понять, подходит ли оно моей цели.")
-                            quickPrompt("Плато веса", "Почему вес может стоять и что изменить без голодовки?")
-                            quickPrompt("Белок", "Сколько белка мне осталось и чем его добрать?")
+                        HStack {
+                            PremiumTextField(placeholder: "Литры", text: $water, keyboard: .decimalPad)
+                            PremiumButton(title: "Добавить", icon: "drop.fill", tint: AppColors.blue) {
+                                onAddWater(number(water))
+                                dismiss()
+                            }
                         }
                     }
-                    .padding(.bottom, 10)
                 }
+
+                PremiumCard(padding: 14, radius: 18) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Вес")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                        HStack {
+                            PremiumTextField(placeholder: "кг", text: $weight, keyboard: .decimalPad)
+                            PremiumButton(title: "Сохранить", icon: "scalemass", tint: AppColors.purple) {
+                                onRecordWeight(number(weight))
+                                dismiss()
+                            }
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
             }
             .padding(22)
         }
-    }
-
-    private var openFullChatButton: some View {
-        Button {
-            Haptics.tap()
-            openChat()
-        } label: {
-            HStack(spacing: 12) {
-                IconBadge(systemName: "sparkles", tint: AppColors.purple, size: 44)
-                Text("Открыть Алису")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(AppColors.mutedText)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .photo:
+                PhotoFoodSheet { draft in
+                    onSaveMeal(draft)
+                    activeSheet = nil
+                    dismiss()
+                }
+            case .manual:
+                ManualFoodSheet { draft in
+                    onSaveMeal(draft)
+                    activeSheet = nil
+                    dismiss()
+                }
+            case .search:
+                SearchFoodSheet { draft in
+                    onSaveMeal(draft)
+                    activeSheet = nil
+                    dismiss()
+                }
+            case .details, .allMeals:
+                EmptyView()
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white.opacity(0.060)))
         }
-        .buttonStyle(.plain)
     }
 
-    private func quickPrompt(_ title: String, _ text: String) -> some View {
+    private func quickAction(_ title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.tap()
-            submit(text)
+            action()
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
+                IconBadge(systemName: icon, tint: tint, size: 46)
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
                     .fixedSize(horizontal: false, vertical: true)
-                Image(systemName: "sparkles")
-                    .foregroundStyle(AppColors.purple)
             }
-            .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 106, alignment: .topLeading)
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -158,5 +173,9 @@ private struct AIQuickComposerSheet: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private func number(_ text: String) -> Double {
+        Double(text.replacingOccurrences(of: ",", with: ".")) ?? 0
     }
 }

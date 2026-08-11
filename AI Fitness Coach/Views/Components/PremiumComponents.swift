@@ -132,24 +132,9 @@ struct SectionHeader: View {
 struct PageHeader: View {
     let title: String
     var subtitle: String?
-    var aiTitle: String = "Алиса AI"
-    var aiIcon: String = "sparkles"
-    var aiAction: () -> Void
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top) {
-                titleBlock
-                Spacer(minLength: 16)
-                AIHelperButton(title: aiTitle, systemImage: aiIcon, action: aiAction)
-                    .padding(.top, 4)
-            }
-
-            VStack(alignment: .leading, spacing: 14) {
-                titleBlock
-                AIHelperButton(title: aiTitle, systemImage: aiIcon, action: aiAction)
-            }
-        }
+        titleBlock
     }
 
     private var titleBlock: some View {
@@ -169,41 +154,6 @@ struct PageHeader: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-}
-
-struct AIHelperButton: View {
-    let title: String
-    var systemImage: String = "sparkles"
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            Haptics.tap()
-            action()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(AppColors.purple)
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-            .lineLimit(1)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(
-                Capsule()
-                    .fill(Color.white.opacity(0.060))
-                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityIdentifier("ai.helper.\(title)")
     }
 }
 
@@ -421,7 +371,6 @@ struct PremiumTabBar: View {
             tabButton(.home)
             tabButton(.nutrition)
             plusButton
-            tabButton(.coach)
             tabButton(.profile)
         }
         .padding(.horizontal, 18)
@@ -457,15 +406,15 @@ struct PremiumTabBar: View {
                     .stroke(AppColors.purple, lineWidth: 3)
                     .frame(width: 58, height: 58)
                     .shadow(color: AppColors.purple.opacity(0.35), radius: 12)
-                Image(systemName: "sparkles")
+                Image(systemName: "plus")
                     .font(.system(size: 25, weight: .semibold))
                     .foregroundStyle(.white)
             }
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Алиса quick composer")
-        .accessibilityIdentifier("tab.plus.ai")
+        .accessibilityLabel("Быстро добавить")
+        .accessibilityIdentifier("tab.plus.quickAdd")
     }
 
     private func tabButton(_ tab: CoachTab) -> some View {

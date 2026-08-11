@@ -16,17 +16,12 @@ final class AI_Fitness_CoachUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Питание"].waitForExistence(timeout: 3))
         capture("nutrition")
 
-        openAliceFromHeader()
-        XCTAssertTrue(app.staticTexts["Алиса"].waitForExistence(timeout: 3))
+        tapTab("plus.quickAdd")
+        XCTAssertTrue(app.staticTexts["Быстро добавить"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Фото еды"].exists)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Т\\nр'")).firstMatch.exists)
-        capture("alice")
-
-        tapTab("plus.ai")
-        XCTAssertTrue(app.staticTexts["Алиса"].waitForExistence(timeout: 3))
-        capture("alice-quick-composer")
-        if app.buttons["Открыть Алису"].exists {
-            app.buttons["Открыть Алису"].tap()
-        }
+        capture("quick-add")
+        app.swipeDown()
 
         tapTab("profile")
         XCTAssertTrue(app.staticTexts["Профиль"].waitForExistence(timeout: 3))
@@ -47,12 +42,6 @@ final class AI_Fitness_CoachUITests: XCTestCase {
     private func tapTab(_ id: String) {
         let button = app.buttons["tab.\(id)"]
         XCTAssertTrue(button.waitForExistence(timeout: 3), "Missing tab \(id)")
-        button.tap()
-    }
-
-    private func openAliceFromHeader() {
-        let button = app.buttons["ai.helper.Алиса AI"].firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 3), "Missing Alice helper button")
         button.tap()
     }
 
