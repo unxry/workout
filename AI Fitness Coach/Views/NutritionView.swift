@@ -218,9 +218,12 @@ struct NutritionView: View {
 
     private var quickAddGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
-            QuickActionCard(icon: "camera", title: "Фото еды", subtitle: "Локальный анализ\nбез интернета", tint: AppColors.green) { activeSheet = .photo }
+            QuickActionCard(icon: "camera", title: "Фото еды", subtitle: "Анализ +\nonline БЖУ", tint: AppColors.green) { activeSheet = .photo }
+                .accessibilityIdentifier("nutrition.quick.photo")
             QuickActionCard(icon: "pencil", title: "Вручную", subtitle: "Ввести продукты\nсамому", tint: AppColors.blue) { activeSheet = .manual }
-            QuickActionCard(icon: "magnifyingglass", title: "Найти продукт", subtitle: "Локально +\nинтернет", tint: AppColors.orange) { activeSheet = .search }
+                .accessibilityIdentifier("nutrition.quick.manual")
+            QuickActionCard(icon: "magnifyingglass", title: "Найти продукт", subtitle: "Online поиск\nпо базе", tint: AppColors.orange) { activeSheet = .search }
+                .accessibilityIdentifier("nutrition.quick.search")
         }
     }
 
@@ -472,16 +475,17 @@ struct ManualFoodSheet: View {
             LabeledPremiumField(label: "Название продукта / блюда", placeholder: "Например: салат Оливье", text: $title)
             LabeledPremiumField(label: "Вес порции", placeholder: "250 г", text: $weight, keyboard: .decimalPad)
 
-            Button {
+            NutritionLookupButton(
+                title: isLookingUp ? "Ищу в интернете..." : "Найти БЖУ по названию",
+                subtitle: "Сначала online, затем точный cache",
+                icon: "network",
+                isLoading: isLookingUp,
+                isEnabled: !isLookingUp && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                accessibilityID: "nutrition.manual.lookupOnline"
+            ) {
                 dismissKeyboard()
                 Task { await lookupNutrition() }
-            } label: {
-                Label(isLookingUp ? "Ищу пищевые значения..." : "Найти БЖУ по названию", systemImage: "magnifyingglass")
-                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppColors.purple)
-            .disabled(isLookingUp || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
             if let lookupMessage {
                 PremiumCard(padding: 12, radius: 14) {
@@ -599,21 +603,16 @@ struct PhotoFoodSheet: View {
                 .tint(AppColors.green)
             }
 
-            Button {
+            NutritionLookupButton(
+                title: isAnalyzing || isLookingUpNutrition ? "Анализирую..." : "Анализировать фото",
+                subtitle: "Еда локально, БЖУ через online-поиск",
+                icon: "camera.metering.center.weighted",
+                isLoading: isAnalyzing || isLookingUpNutrition,
+                isEnabled: imageData != nil && !isAnalyzing && !isLookingUpNutrition,
+                accessibilityID: "nutrition.photo.analyzeOnline"
+            ) {
                 Task { await analyze() }
-            } label: {
-                HStack(spacing: 10) {
-                    if isAnalyzing || isLookingUpNutrition {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                    Label(isAnalyzing || isLookingUpNutrition ? "Анализирую..." : "Анализировать локально", systemImage: "camera.metering.center.weighted")
-                }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppColors.purple)
-            .disabled(imageData == nil || isAnalyzing || isLookingUpNutrition)
 
             HStack(spacing: 10) {
                 Button {
@@ -811,14 +810,31 @@ struct SearchFoodSheet: View {
                     dismissKeyboard()
                     Task { await search(includeInternet: true) }
                 } label: {
-                    Image(systemName: isSearching ? "hourglass" : "magnifyingglass")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 52, height: 52)
-                        .background(Circle().fill(AppColors.purple.opacity(0.75)))
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [AppColors.purple.opacity(0.95), AppColors.blue.opacity(0.74)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .shadow(color: AppColors.purple.opacity(0.42), radius: 14, x: 0, y: 7)
+                        if isSearching {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "network")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .frame(width: 56, height: 56)
                 }
                 .buttonStyle(.plain)
                 .disabled(isSearching || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .opacity(isSearching || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+                .accessibilityIdentifier("nutrition.search.lookupOnline")
             }
 
             if let message {
@@ -1250,6 +1266,77 @@ private struct LabeledPremiumField: View {
             PremiumTextField(placeholder: placeholder, text: $text, keyboard: keyboard)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct NutritionLookupButton: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let isLoading: Bool
+    let isEnabled: Bool
+    let accessibilityID: String
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            guard isEnabled else { return }
+            Haptics.tap()
+            action()
+        } label: {
+            HStack(spacing: 13) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.12))
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 18, weight: .bold))
+                    }
+                }
+                .frame(width: 42, height: 42)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.82))
+            }
+            .padding(.horizontal, 15)
+            .frame(maxWidth: .infinity)
+            .frame(height: 64)
+            .background(
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: isEnabled
+                                ? [AppColors.purple.opacity(0.98), AppColors.blue.opacity(0.70)]
+                                : [Color.white.opacity(0.10), Color.white.opacity(0.06)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(Capsule().stroke(Color.white.opacity(isEnabled ? 0.18 : 0.08), lineWidth: 1))
+                    .shadow(color: isEnabled ? AppColors.purple.opacity(0.30) : .clear, radius: 18, x: 0, y: 10)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.58)
+        .accessibilityIdentifier(accessibilityID)
     }
 }
 

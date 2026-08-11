@@ -94,26 +94,62 @@ struct LocalProductSearchProvider: ProductSearchProvider {
 struct OpenFoodFactsSearchProvider: ProductSearchProvider {
     let name = "Open Food Facts"
     private let session: URLSession
+    private let endpoints: [Endpoint] = [
+        Endpoint(baseURL: "https://world.openfoodfacts.net/cgi/search.pl", apiVersion: .cgi),
+        Endpoint(baseURL: "https://world.openfoodfacts.org/api/v2/search", apiVersion: .v2),
+        Endpoint(baseURL: "https://world.openfoodfacts.org/cgi/search.pl", apiVersion: .cgi)
+    ]
 
     init(session: URLSession = .shared) {
         self.session = session
     }
 
     func search(query: String) async throws -> [ProductSearchResult] {
-        guard var components = URLComponents(string: "https://world.openfoodfacts.org/cgi/search.pl") else { return [] }
-        components.queryItems = [
-            URLQueryItem(name: "search_terms", value: query),
-            URLQueryItem(name: "search_simple", value: "1"),
-            URLQueryItem(name: "action", value: "process"),
-            URLQueryItem(name: "json", value: "1"),
-            URLQueryItem(name: "page_size", value: "12"),
-            URLQueryItem(name: "fields", value: "code,product_name,brands,quantity,nutriments,url")
-        ]
+        var lastError: Error?
+        for candidate in queryVariants(for: query) {
+            for endpoint in endpoints {
+                do {
+                    let results = try await search(candidate, endpoint: endpoint)
+                    if !results.isEmpty {
+                        return results
+                    }
+                } catch {
+                    lastError = error
+                    continue
+                }
+            }
+        }
+        if let lastError {
+            throw lastError
+        }
+        return []
+    }
+
+    private func search(_ query: String, endpoint: Endpoint) async throws -> [ProductSearchResult] {
+        guard var components = URLComponents(string: endpoint.baseURL) else { return [] }
+        switch endpoint.apiVersion {
+        case .cgi:
+            components.queryItems = [
+                URLQueryItem(name: "search_terms", value: query),
+                URLQueryItem(name: "search_simple", value: "1"),
+                URLQueryItem(name: "action", value: "process"),
+                URLQueryItem(name: "json", value: "1"),
+                URLQueryItem(name: "page_size", value: "16"),
+                URLQueryItem(name: "fields", value: "code,product_name,brands,quantity,nutriments,url")
+            ]
+        case .v2:
+            components.queryItems = [
+                URLQueryItem(name: "search_terms", value: query),
+                URLQueryItem(name: "page_size", value: "16"),
+                URLQueryItem(name: "fields", value: "code,product_name,brands,quantity,nutriments,url")
+            ]
+        }
         guard let url = components.url else { return [] }
 
         var request = URLRequest(url: url)
-        request.timeoutInterval = 12
+        request.timeoutInterval = 8
         request.setValue("work0ut iOS - internet-first product search", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let (data, response) = try await session.data(for: request)
         guard (response as? HTTPURLResponse)?.statusCode ?? 500 < 400 else {
@@ -123,6 +159,46 @@ struct OpenFoodFactsSearchProvider: ProductSearchProvider {
         let decoded = try JSONDecoder().decode(OpenFoodFactsSearchResponse.self, from: data)
         return decoded.products.compactMap(mapProduct)
     }
+
+    private func queryVariants(for query: String) -> [String] {
+        let normalized = ProductSearchService.searchableQuery(query)
+        let tokens = Set(normalized.split(separator: " ").map(String.init))
+        var variants = [normalized].filter { !$0.isEmpty }
+        let translated = tokens.compactMap { Self.translation[$0] }
+        if !translated.isEmpty {
+            variants.append(translated.joined(separator: " "))
+        }
+        if tokens.contains("оливье") {
+            variants.append("olivier salad")
+        }
+        if tokens.contains("творог") {
+            variants.append("cottage cheese")
+            variants.append("quark")
+        }
+        return Array(NSOrderedSet(array: variants)) as? [String] ?? variants
+    }
+
+    private static let translation: [String: String] = [
+        "банан": "banana",
+        "молоко": "milk lait",
+        "яйцо": "egg",
+        "яйца": "eggs",
+        "рис": "rice",
+        "курица": "chicken",
+        "грудка": "breast",
+        "овсянка": "oatmeal",
+        "гречка": "buckwheat",
+        "лосось": "salmon",
+        "семга": "salmon",
+        "говядина": "beef",
+        "йогурт": "yogurt",
+        "сыр": "cheese",
+        "хлеб": "bread",
+        "картофель": "potato",
+        "картошка": "potato",
+        "макароны": "pasta",
+        "творог": "cottage cheese"
+    ]
 
     private func mapProduct(_ item: OpenFoodFactsProduct) -> ProductSearchResult? {
         let name = item.productName?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -147,7 +223,7 @@ struct OpenFoodFactsSearchProvider: ProductSearchProvider {
                 brand: item.brands,
                 packageGrams: grams(from: item.quantity),
                 source: self.name,
-                sourceURL: item.url
+                sourceURL: item.safeURL
             )
             return ProductSearchResult(product: product, source: self.name, hasConfirmedNutrition: false, notice: "БЖУ не указаны источником.")
         }
@@ -166,7 +242,7 @@ struct OpenFoodFactsSearchProvider: ProductSearchProvider {
             brand: item.brands,
             packageGrams: grams(from: item.quantity),
             source: self.name,
-            sourceURL: item.url
+            sourceURL: item.safeURL
         )
         return ProductSearchResult(
             product: product,
@@ -204,9 +280,11 @@ final class ProductSearchService {
     func search(query: String, localProducts: [FoodProduct], includeInternet: Bool = true) async -> ProductSearchOutcome {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let searchable = Self.searchableQuery(trimmed)
+        let displayQuery = searchable.isEmpty ? trimmed : searchable
         guard !searchable.isEmpty else {
             let localResults = await relevantLocalResults(query: searchable, localProducts: localProducts)
-            return ProductSearchOutcome(results: Array(localResults.prefix(12)), usedInternet: false, message: nil)
+            let message = trimmed.isEmpty ? nil : "Введите название продукта без служебных слов вроде «БЖУ» или «100 г»."
+            return ProductSearchOutcome(results: Array(localResults.prefix(12)), usedInternet: false, message: message)
         }
 
         guard includeInternet else {
@@ -223,10 +301,10 @@ final class ProductSearchService {
                     Self.relevanceScore(for: result.product, query: searchable) >= Self.minimumRemoteRelevanceScore
                 }
             let localResults = await relevantLocalResults(query: searchable, localProducts: localProducts)
-            let merged = merge(remoteResults + localResults, preferInternet: !remoteResults.isEmpty)
+            let merged = rank(merge(remoteResults + localResults, preferInternet: !remoteResults.isEmpty), query: searchable, preferInternet: !remoteResults.isEmpty)
             let message: String?
             if merged.isEmpty {
-                message = "Не удалось найти данные для «\(searchable)»."
+                message = "Не удалось найти данные для «\(displayQuery)»."
             } else if remoteResults.isEmpty {
                 message = "В интернете нет точного совпадения. Показаны только релевантные сохраненные данные."
             } else {
@@ -235,7 +313,7 @@ final class ProductSearchService {
             return ProductSearchOutcome(results: merged, usedInternet: true, message: message)
         } catch {
             let localResults = await relevantLocalResults(query: searchable, localProducts: localProducts)
-            return ProductSearchOutcome(results: localResults, usedInternet: false, message: message(for: error, query: searchable, hasLocalResults: !localResults.isEmpty))
+            return ProductSearchOutcome(results: localResults, usedInternet: false, message: message(for: error, query: displayQuery, hasLocalResults: !localResults.isEmpty))
         }
     }
 
@@ -245,9 +323,14 @@ final class ProductSearchService {
     }
 
     private func message(for error: Error, query: String, hasLocalResults: Bool) -> String {
-        let fallback = hasLocalResults
-            ? "Показаны только точные сохраненные совпадения."
-            : "Не удалось найти данные для «\(query)». Проверь подключение или повтори позже."
+        let fallback: String
+        if hasLocalResults {
+            fallback = "Показаны только точные сохраненные совпадения."
+        } else if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fallback = "Не удалось найти данные. Проверь подключение или повтори позже."
+        } else {
+            fallback = "Не удалось найти данные для «\(query)». Проверь подключение или повтори позже."
+        }
 
         guard let urlError = error as? URLError else {
             return "Не удалось выполнить интернет-поиск. \(fallback)"
@@ -292,6 +375,25 @@ final class ProductSearchService {
         }
     }
 
+    private func rank(_ results: [ProductSearchResult], query: String, preferInternet: Bool) -> [ProductSearchResult] {
+        results.sorted { lhs, rhs in
+            let lhsScore = Self.relevanceScore(for: lhs.product, query: query)
+            let rhsScore = Self.relevanceScore(for: rhs.product, query: query)
+            if lhsScore != rhsScore {
+                return lhsScore > rhsScore
+            }
+            let lhsRemote = lhs.source != "Локальная база"
+            let rhsRemote = rhs.source != "Локальная база"
+            if preferInternet, lhsRemote != rhsRemote {
+                return lhsRemote
+            }
+            if lhs.sourceQuality.rank != rhs.sourceQuality.rank {
+                return lhs.sourceQuality.rank > rhs.sourceQuality.rank
+            }
+            return lhs.confidence > rhs.confidence
+        }
+    }
+
     private func better(_ lhs: ProductSearchResult, _ rhs: ProductSearchResult, preferInternet: Bool = false) -> ProductSearchResult {
         if preferInternet {
             let lhsRemote = lhs.source != "Локальная база"
@@ -322,15 +424,23 @@ final class ProductSearchService {
     }
 
     static func relevanceScore(for product: FoodProduct, query: String) -> Int {
-        let queryTokens = normalizedFoodTokens(query).filter { !lookupStopWords.contains($0) }
+        let baseTokens = normalizedFoodTokens(query).filter { !lookupStopWords.contains($0) }
+        let queryTokens = Array(Set(baseTokens + baseTokens.compactMap { translatedFoodTokens[$0] }))
         guard !queryTokens.isEmpty else { return 0 }
 
         let nameTokens = normalizedFoodTokens(product.name)
         let aliasTokens = product.aliases.flatMap(normalizedFoodTokens)
         let brandTokens = normalizedFoodTokens(product.brand ?? "")
         let categoryTokens = normalizedFoodTokens(product.category)
-        let decisiveTokens = queryTokens.filter { !genericOnlyWords.contains($0) }
-        var matchedDecisive = Set<String>()
+        let decisiveGroups = baseTokens
+            .filter { !genericOnlyWords.contains($0) }
+            .map { token -> Set<String> in
+                var group: Set<String> = [token]
+                if let translated = translatedFoodTokens[token] {
+                    group.formUnion(normalizedFoodTokens(translated))
+                }
+                return group
+            }
         var matchedAny = Set<String>()
         var score = 0
 
@@ -339,37 +449,31 @@ final class ProductSearchService {
             if nameTokens.contains(token) {
                 score += isDecisive ? 80 : 20
                 matchedAny.insert(token)
-                if isDecisive { matchedDecisive.insert(token) }
             } else if aliasTokens.contains(token) {
                 score += isDecisive ? 70 : 15
                 matchedAny.insert(token)
-                if isDecisive { matchedDecisive.insert(token) }
             } else if brandTokens.contains(token) {
                 score += isDecisive ? 45 : 10
                 matchedAny.insert(token)
-                if isDecisive { matchedDecisive.insert(token) }
             } else if nameTokens.contains(where: { Self.isPrefixMatch($0, token) }) {
                 score += isDecisive ? 42 : 12
                 matchedAny.insert(token)
-                if isDecisive { matchedDecisive.insert(token) }
             } else if aliasTokens.contains(where: { Self.isPrefixMatch($0, token) }) {
                 score += isDecisive ? 38 : 10
                 matchedAny.insert(token)
-                if isDecisive { matchedDecisive.insert(token) }
             } else if categoryTokens.contains(token), queryTokens.count == 1 {
                 score += isDecisive ? 24 : 6
                 matchedAny.insert(token)
-                if isDecisive { matchedDecisive.insert(token) }
             }
         }
 
-        if !decisiveTokens.isEmpty, matchedDecisive.isEmpty {
+        let matchedDecisiveGroups = decisiveGroups.filter { group in
+            !group.isDisjoint(with: matchedAny)
+        }.count
+        if !decisiveGroups.isEmpty, matchedDecisiveGroups == 0 {
             return 0
         }
-        if decisiveTokens.count >= 2, matchedDecisive.count < min(2, decisiveTokens.count) {
-            return 0
-        }
-        if decisiveTokens.isEmpty, score < minimumLocalRelevanceScore {
+        if decisiveGroups.isEmpty, score < minimumLocalRelevanceScore {
             return 0
         }
         return matchedAny.isEmpty ? 0 : score
@@ -398,6 +502,29 @@ final class ProductSearchService {
     private static let genericOnlyWords: Set<String> = [
         "салат", "еда", "блюдо", "продукт", "продукты"
     ]
+
+    private static let translatedFoodTokens: [String: String] = [
+        "банан": "banana",
+        "молоко": "milk",
+        "яйцо": "egg",
+        "яйца": "eggs",
+        "рис": "rice",
+        "курица": "chicken",
+        "грудка": "breast",
+        "овсянка": "oatmeal",
+        "гречка": "buckwheat",
+        "лосось": "salmon",
+        "семга": "salmon",
+        "говядина": "beef",
+        "йогурт": "yogurt",
+        "сыр": "cheese",
+        "хлеб": "bread",
+        "картофель": "potato",
+        "картошка": "potato",
+        "макароны": "pasta",
+        "творог": "cottage",
+        "оливье": "olivier"
+    ]
 }
 
 struct ProductSearchOutcome: Equatable {
@@ -410,13 +537,33 @@ private struct OpenFoodFactsSearchResponse: Decodable {
     var products: [OpenFoodFactsProduct]
 }
 
+private struct Endpoint {
+    var baseURL: String
+    var apiVersion: OpenFoodFactsAPIVersion
+}
+
+private enum OpenFoodFactsAPIVersion {
+    case cgi
+    case v2
+}
+
 private struct OpenFoodFactsProduct: Decodable {
     var code: String?
     var productName: String?
     var brands: String?
     var quantity: String?
     var nutriments: OpenFoodFactsNutriments
-    var url: URL?
+    private var rawURL: String?
+
+    var safeURL: URL? {
+        guard let rawURL, !rawURL.isEmpty else { return nil }
+        if let url = URL(string: rawURL) {
+            return url
+        }
+        return rawURL
+            .addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed)
+            .flatMap(URL.init(string:))
+    }
 
     enum CodingKeys: String, CodingKey {
         case code
@@ -424,7 +571,7 @@ private struct OpenFoodFactsProduct: Decodable {
         case brands
         case quantity
         case nutriments
-        case url
+        case rawURL = "url"
     }
 }
 

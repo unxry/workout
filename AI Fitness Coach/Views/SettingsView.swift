@@ -433,8 +433,9 @@ private struct NotificationsSettingsSheet: View {
             do {
                 let allowed = try await appState.notifications.requestAuthorization()
                 if allowed {
-                    await appState.notifications.scheduleDailyCoachCheckIn()
-                    status = "Уведомления включены"
+                    await appState.notifications.scheduleDefaultReminders()
+                    let count = await appState.notifications.pendingReminderCount()
+                    status = "Уведомления включены: запланировано \(count)"
                 } else {
                     status = "Разрешение не выдано"
                 }

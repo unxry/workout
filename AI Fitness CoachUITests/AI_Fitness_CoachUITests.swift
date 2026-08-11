@@ -28,6 +28,53 @@ final class AI_Fitness_CoachUITests: XCTestCase {
         capture("profile")
     }
 
+    func testOnlineFoodSearchFindsOlivierWithoutUnrelatedFallback() throws {
+        try openProductSearch()
+        try assertOnlineSearch(query: "салат оливье", expectedText: "оливье")
+        XCTAssertFalse(app.staticTexts["Овсянка на воде"].exists)
+        XCTAssertFalse(app.staticTexts["Говядина постная"].exists)
+    }
+
+    func testOnlineFoodSearchFindsSeveralProductsOnDeviceNetwork() throws {
+        try openProductSearch()
+        try assertOnlineSearch(query: "творог", expectedText: "творог")
+        restartApp()
+
+        try openProductSearch()
+        try assertOnlineSearch(query: "банан", expectedText: "банан")
+        restartApp()
+
+        try openProductSearch()
+        try assertOnlineSearch(query: "салат оливье", expectedText: "оливье")
+    }
+
+    private func openProductSearch() throws {
+        completeOnboardingIfNeeded()
+        tapTab("nutrition")
+        XCTAssertTrue(app.staticTexts["Питание"].waitForExistence(timeout: 3))
+
+        let searchCard = app.buttons["nutrition.quick.search"]
+        for _ in 0..<4 where !searchCard.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(searchCard.waitForExistence(timeout: 3))
+        searchCard.tap()
+    }
+
+    private func assertOnlineSearch(query: String, expectedText: String) throws {
+        let field = app.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
+        field.tap()
+        field.typeText(query)
+
+        let lookup = app.buttons["nutrition.search.lookupOnline"]
+        XCTAssertTrue(lookup.waitForExistence(timeout: 3))
+        lookup.tap()
+
+        let result = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", expectedText)).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 20), "Expected online result containing \(expectedText) for \(query)")
+    }
+
     private func completeOnboardingIfNeeded() {
         guard app.staticTexts["AI Fitness Coach"].waitForExistence(timeout: 2) else { return }
         let button = app.buttons["onboarding.createPlan"]
@@ -43,6 +90,11 @@ final class AI_Fitness_CoachUITests: XCTestCase {
         let button = app.buttons["tab.\(id)"]
         XCTAssertTrue(button.waitForExistence(timeout: 3), "Missing tab \(id)")
         button.tap()
+    }
+
+    private func restartApp() {
+        app.terminate()
+        app.launch()
     }
 
     private func capture(_ name: String) {

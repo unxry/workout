@@ -43,6 +43,9 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.unxry.aifitnesscoach.tests
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 62UBRUWU6H
   AI Fitness CoachUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -56,6 +59,8 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.unxry.aifitnesscoach.uitests
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 62UBRUWU6H
 schemes:
   AI Fitness Coach:
     build:
