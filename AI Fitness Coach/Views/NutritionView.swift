@@ -469,10 +469,11 @@ struct ManualFoodSheet: View {
 
     var body: some View {
         FoodFormShell(title: "Добавить вручную") {
-            PremiumTextField(placeholder: "Название", text: $title)
-            PremiumTextField(placeholder: "Вес порции, г", text: $weight, keyboard: .decimalPad)
+            LabeledPremiumField(label: "Название продукта / блюда", placeholder: "Например: салат Оливье", text: $title)
+            LabeledPremiumField(label: "Вес порции", placeholder: "250 г", text: $weight, keyboard: .decimalPad)
 
             Button {
+                dismissKeyboard()
                 Task { await lookupNutrition() }
             } label: {
                 Label(isLookingUp ? "Ищу пищевые значения..." : "Найти БЖУ по названию", systemImage: "magnifyingglass")
@@ -497,11 +498,11 @@ struct ManualFoodSheet: View {
                 }
             }
 
-            PremiumTextField(placeholder: "Калории", text: $calories, keyboard: .decimalPad)
+            LabeledPremiumField(label: "Калории", placeholder: "Ккал", text: $calories, keyboard: .decimalPad)
             HStack(spacing: 10) {
-                PremiumTextField(placeholder: "Белок", text: $protein, keyboard: .decimalPad)
-                PremiumTextField(placeholder: "Жиры", text: $fat, keyboard: .decimalPad)
-                PremiumTextField(placeholder: "Углеводы", text: $carbs, keyboard: .decimalPad)
+                LabeledPremiumField(label: "Белок", placeholder: "г", text: $protein, keyboard: .decimalPad)
+                LabeledPremiumField(label: "Жиры", placeholder: "г", text: $fat, keyboard: .decimalPad)
+                LabeledPremiumField(label: "Углеводы", placeholder: "г", text: $carbs, keyboard: .decimalPad)
             }
             PremiumButton(title: "Добавить прием пищи", icon: "checkmark", tint: AppColors.green) {
                 guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -525,7 +526,7 @@ struct ManualFoodSheet: View {
         guard !trimmed.isEmpty else { return }
         isLookingUp = true
         defer { isLookingUp = false }
-        let outcome = await ProductSearchService().search(query: "\(trimmed) БЖУ на 100 г", localProducts: store.foodProducts, includeInternet: true)
+        let outcome = await ProductSearchService().search(query: trimmed, localProducts: store.foodProducts, includeInternet: true)
         lookupResults = outcome.results.filter(\.hasConfirmedNutrition)
         lookupMessage = outcome.message ?? (lookupResults.isEmpty ? "Не удалось найти надежные пищевые данные. Можно заполнить значения вручную." : "Выбери вариант и подтверди значения перед сохранением.")
     }
@@ -601,8 +602,14 @@ struct PhotoFoodSheet: View {
             Button {
                 Task { await analyze() }
             } label: {
-                Label(isAnalyzing ? "Анализирую фото..." : "Анализировать локально", systemImage: "camera.metering.center.weighted")
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 10) {
+                    if isAnalyzing || isLookingUpNutrition {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    Label(isAnalyzing || isLookingUpNutrition ? "Анализирую..." : "Анализировать локально", systemImage: "camera.metering.center.weighted")
+                }
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .tint(AppColors.purple)
@@ -617,8 +624,9 @@ struct PhotoFoodSheet: View {
                 } label: {
                     Label("Очистить", systemImage: "xmark.circle")
                 }
-                .buttonStyle(.bordered)
-                .tint(AppColors.purple)
+            .buttonStyle(.bordered)
+            .tint(AppColors.purple)
+            .disabled(imageData == nil && analysis == nil && errorMessage == nil)
             }
 
             if let errorMessage {
@@ -664,13 +672,13 @@ struct PhotoFoodSheet: View {
                         }
                     }
 
-                    PremiumTextField(placeholder: "Название", text: $title)
-                    PremiumTextField(placeholder: "Вес, г", text: $grams, keyboard: .decimalPad)
-                    PremiumTextField(placeholder: "Калории", text: $calories, keyboard: .decimalPad)
+                    LabeledPremiumField(label: "Название продукта / блюда", placeholder: "Название", text: $title)
+                    LabeledPremiumField(label: "Вес порции", placeholder: "250 г", text: $grams, keyboard: .decimalPad)
+                    LabeledPremiumField(label: "Калории", placeholder: "Ккал", text: $calories, keyboard: .decimalPad)
                     HStack(spacing: 10) {
-                        PremiumTextField(placeholder: "Белок", text: $protein, keyboard: .decimalPad)
-                        PremiumTextField(placeholder: "Жиры", text: $fat, keyboard: .decimalPad)
-                        PremiumTextField(placeholder: "Углеводы", text: $carbs, keyboard: .decimalPad)
+                        LabeledPremiumField(label: "Белок", placeholder: "г", text: $protein, keyboard: .decimalPad)
+                        LabeledPremiumField(label: "Жиры", placeholder: "г", text: $fat, keyboard: .decimalPad)
+                        LabeledPremiumField(label: "Углеводы", placeholder: "г", text: $carbs, keyboard: .decimalPad)
                     }
 
                     PremiumButton(title: "Подтвердить и сохранить", icon: "checkmark", tint: AppColors.green) {
@@ -731,7 +739,7 @@ struct PhotoFoodSheet: View {
     private func enrichWithInternetNutrition(_ analysis: FoodPhotoAnalysis) async -> FoodPhotoAnalysis {
         var enrichedItems: [FoodEstimateItem] = []
         for item in analysis.items {
-            let outcome = await ProductSearchService().search(query: "\(item.name) БЖУ на 100 г", localProducts: NutritionDatabaseService.defaultProducts, includeInternet: true)
+            let outcome = await ProductSearchService().search(query: item.name, localProducts: NutritionDatabaseService.defaultProducts, includeInternet: true)
             guard let match = outcome.results.first(where: \.hasConfirmedNutrition) else {
                 enrichedItems.append(item)
                 continue
@@ -793,12 +801,14 @@ struct SearchFoodSheet: View {
     @State private var message: String?
     @State private var isSearching = false
     @State private var selectedResult: ProductSearchResult?
+    @State private var showManualEntry = false
 
     var body: some View {
         FoodFormShell(title: "Найти продукт") {
             HStack(spacing: 10) {
                 PremiumTextField(placeholder: "Например: творог Простоквашино 5%", text: $query)
                 Button {
+                    dismissKeyboard()
                     Task { await search(includeInternet: true) }
                 } label: {
                     Image(systemName: isSearching ? "hourglass" : "magnifyingglass")
@@ -820,6 +830,10 @@ struct SearchFoodSheet: View {
                 }
             }
 
+            if shouldShowEmptyState {
+                emptySearchState
+            }
+
             ForEach(results) { result in
                 productRow(result)
             }
@@ -833,8 +847,54 @@ struct SearchFoodSheet: View {
                 dismiss()
             }
         }
+        .sheet(isPresented: $showManualEntry) {
+            ManualFoodSheet { draft in
+                onSave(draft)
+                dismiss()
+            }
+        }
         .task {
             await search(includeInternet: false)
+        }
+    }
+
+    private var shouldShowEmptyState: Bool {
+        !isSearching && results.isEmpty && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && message != nil
+    }
+
+    private var emptySearchState: some View {
+        PremiumCard(padding: 16, radius: 18) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(message ?? "Не удалось найти данные.")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Приложение не будет подставлять БЖУ от другого продукта. Можно повторить поиск, изменить запрос или ввести значения вручную.")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(AppColors.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    Button("Повторить") {
+                        dismissKeyboard()
+                        Task { await search(includeInternet: true) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppColors.purple)
+
+                    Button("Ввести вручную") {
+                        showManualEntry = true
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(AppColors.green)
+                }
+                Button("Изменить запрос") {
+                    query = ""
+                    results = []
+                    message = nil
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(AppColors.purple)
+            }
         }
     }
 
@@ -964,7 +1024,7 @@ private struct ProductLookupResultCard: View {
                     Button {
                         action()
                     } label: {
-                        Text("Выбрать и проверить")
+                        Text("Использовать")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -1063,19 +1123,19 @@ private struct ProductConfirmationSheet: View {
                         }
                     }
 
-                    PremiumTextField(placeholder: "Название", text: $name)
-                    PremiumTextField(placeholder: "Порция, г", text: $grams, keyboard: .decimalPad)
+                    LabeledPremiumField(label: "Название продукта / блюда", placeholder: "Название", text: $name)
+                    LabeledPremiumField(label: "Вес порции", placeholder: "250 г", text: $grams, keyboard: .decimalPad)
 
                     PremiumCard(padding: 14, radius: 16) {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("На 100 г")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(.white)
-                            PremiumTextField(placeholder: "Ккал / 100 г", text: $kcal100, keyboard: .decimalPad)
+                            LabeledPremiumField(label: "Калории", placeholder: "Ккал / 100 г", text: $kcal100, keyboard: .decimalPad)
                             HStack(spacing: 10) {
-                                PremiumTextField(placeholder: "Б", text: $protein100, keyboard: .decimalPad)
-                                PremiumTextField(placeholder: "Ж", text: $fat100, keyboard: .decimalPad)
-                                PremiumTextField(placeholder: "У", text: $carbs100, keyboard: .decimalPad)
+                                LabeledPremiumField(label: "Белок", placeholder: "г", text: $protein100, keyboard: .decimalPad)
+                                LabeledPremiumField(label: "Жиры", placeholder: "г", text: $fat100, keyboard: .decimalPad)
+                                LabeledPremiumField(label: "Углеводы", placeholder: "г", text: $carbs100, keyboard: .decimalPad)
                             }
                         }
                     }
@@ -1142,14 +1202,33 @@ struct FoodFormShell<Content: View>: View {
     var body: some View {
         ZStack {
             PremiumBackground()
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text(title)
-                        .font(.system(size: 30, weight: .bold))
-                        .foregroundStyle(.white)
-                    content
+            GeometryReader { proxy in
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(title)
+                            .font(.system(size: 30, weight: .bold))
+                            .foregroundStyle(.white)
+                            .fixedSize(horizontal: false, vertical: true)
+                        content
+                    }
+                    .padding(.horizontal, 22)
+                    .padding(.top, max(12, proxy.safeAreaInsets.top + 8))
+                    .padding(.bottom, max(24, proxy.safeAreaInsets.bottom + 24))
                 }
-                .padding(22)
+                .scrollDismissesKeyboard(.interactively)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    dismissKeyboard()
+                }
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Готово") {
+                    dismissKeyboard()
+                }
+                .font(.system(size: 16, weight: .semibold))
             }
         }
         .presentationDetents([.large])
@@ -1157,6 +1236,27 @@ struct FoodFormShell<Content: View>: View {
     }
 }
 
+private struct LabeledPremiumField: View {
+    let label: String
+    let placeholder: String
+    @Binding var text: String
+    var keyboard: UIKeyboardType = .default
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(AppColors.secondaryText)
+            PremiumTextField(placeholder: placeholder, text: $text, keyboard: keyboard)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private func number(_ text: String) -> Double {
     Double(text.replacingOccurrences(of: ",", with: ".")) ?? 0
+}
+
+private func dismissKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
 }

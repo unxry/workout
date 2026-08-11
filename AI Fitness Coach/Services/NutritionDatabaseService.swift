@@ -3,8 +3,8 @@ import Foundation
 struct NutritionDatabaseService {
     private var products: [FoodProduct]
 
-    init(products: [FoodProduct] = NutritionDatabaseService.defaultProducts) {
-        self.products = NutritionDatabaseService.mergedProducts(local: products)
+    init(products: [FoodProduct] = NutritionDatabaseService.defaultProducts, mergeDefaults: Bool = true) {
+        self.products = mergeDefaults ? NutritionDatabaseService.mergedProducts(local: products) : products
     }
 
     func search(_ query: String, limit: Int = 20) -> [FoodProduct] {
@@ -80,4 +80,3 @@ struct NutritionDatabaseService {
         FoodProduct(id: "vegetables", name: "Овощи", aliases: ["vegetable", "salad", "салат", "овощи", "огурец", "помидор"], category: "Овощи", kcalPer100g: 30, proteinPer100g: 1.3, fatPer100g: 0.2, carbsPer100g: 5)
     ]
 }
-

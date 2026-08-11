@@ -270,7 +270,7 @@ final class AI_Fitness_CoachTests: XCTestCase {
 
         XCTAssertFalse(outcome.usedInternet)
         XCTAssertTrue(outcome.results.contains { $0.product.id == "cottage-cheese-5" })
-        XCTAssertEqual(outcome.message, "Показаны сохраненные продукты. Нажми поиск, чтобы проверить интернет-источник.")
+        XCTAssertEqual(outcome.message, "Показаны релевантные сохраненные данные. Нажми поиск, чтобы проверить интернет-источник.")
     }
 
     func testProductSearchEmptyQueryDoesNotClaimInternetIsUnavailable() async {
@@ -285,6 +285,45 @@ final class AI_Fitness_CoachTests: XCTestCase {
         XCTAssertFalse(outcome.results.isEmpty)
     }
 
+    func testOlivierSearchRejectsUnrelatedLocalFallback() async {
+        let outcome = await ProductSearchService(remoteProvider: EmptyProductSearchProvider()).search(
+            query: "салат оливье",
+            localProducts: NutritionDatabaseService.defaultProducts,
+            includeInternet: false
+        )
+
+        XCTAssertTrue(outcome.results.isEmpty)
+        XCTAssertFalse(outcome.results.contains { ["vegetables", "oatmeal-cooked", "beef-lean"].contains($0.product.id) })
+    }
+
+    func testOlivierSearchKeepsRelevantLocalFallbackOnly() async {
+        let products = NutritionDatabaseService.defaultProducts + [
+            FoodProduct(id: "olivier-classic", name: "Оливье классический", aliases: ["салат оливье"], category: "Салаты", kcalPer100g: 198, proteinPer100g: 6, fatPer100g: 15, carbsPer100g: 10)
+        ]
+
+        let outcome = await ProductSearchService(remoteProvider: EmptyProductSearchProvider()).search(
+            query: "салат оливье",
+            localProducts: products,
+            includeInternet: false
+        )
+
+        XCTAssertEqual(outcome.results.first?.product.id, "olivier-classic")
+        XCTAssertFalse(outcome.results.contains { ["vegetables", "oatmeal-cooked", "beef-lean"].contains($0.product.id) })
+    }
+
+    func testInternetFailureDoesNotShowRawErrorCodeOrUnrelatedProducts() async {
+        let outcome = await ProductSearchService(remoteProvider: FailingProductSearchProvider(error: URLError(.badServerResponse))).search(
+            query: "салат оливье",
+            localProducts: NutritionDatabaseService.defaultProducts,
+            includeInternet: true
+        )
+
+        XCTAssertFalse(outcome.usedInternet)
+        XCTAssertTrue(outcome.results.isEmpty)
+        XCTAssertFalse(outcome.message?.contains("-1011") ?? true)
+        XCTAssertTrue(outcome.message?.contains("Не удалось найти данные") ?? false)
+    }
+
     func testProductSearchMergesDuplicateProducts() async {
         let remote = StaticProductSearchProvider(results: [
             ProductSearchResult(product: FoodProduct(id: "remote-cottage", name: "Творог 5%", category: "Интернет", kcalPer100g: 121, proteinPer100g: 17, fatPer100g: 5, carbsPer100g: 2, barcode: "123", source: "Test"), source: "Test", hasConfirmedNutrition: true, notice: nil),
@@ -295,6 +334,22 @@ final class AI_Fitness_CoachTests: XCTestCase {
 
         XCTAssertTrue(outcome.usedInternet)
         XCTAssertEqual(outcome.results.filter { $0.product.barcode == "123" }.count, 1)
+    }
+
+    func testInternetResultIsPreferredOverLocalDuplicate() async {
+        let remote = StaticProductSearchProvider(results: [
+            ProductSearchResult(product: FoodProduct(id: "remote-cottage", name: "Творог 5%", category: "Интернет", kcalPer100g: 122, proteinPer100g: 18, fatPer100g: 5, carbsPer100g: 2, source: "Test"), source: "Test", hasConfirmedNutrition: true, notice: nil)
+        ])
+
+        let outcome = await ProductSearchService(remoteProvider: remote).search(
+            query: "творог",
+            localProducts: NutritionDatabaseService.defaultProducts,
+            includeInternet: true
+        )
+
+        XCTAssertTrue(outcome.usedInternet)
+        XCTAssertEqual(outcome.results.first?.source, "Test")
+        XCTAssertEqual(outcome.results.first?.product.kcalPer100g, 122)
     }
 
     func testComplexDishSearchIsMarkedAsAverageEstimate() async {
@@ -331,5 +386,14 @@ private struct StaticProductSearchProvider: ProductSearchProvider {
 
     func search(query: String) async throws -> [ProductSearchResult] {
         results
+    }
+}
+
+private struct FailingProductSearchProvider: ProductSearchProvider {
+    let name = "Failing"
+    let error: Error
+
+    func search(query: String) async throws -> [ProductSearchResult] {
+        throw error
     }
 }
